@@ -90,7 +90,7 @@ const extractProductFromImage = async (base64Image: string) => {
           content: 'Describe esta imagen en detalle para identificar: modelo, marca, categoria, genero, color, talla, precio. Responde en JSON: {modelo, marca, categoria, genero, color, talla, precio_compra}',
           images: [base64Data]
         }],
-        provider: 'ollama',
+        provider: 'groq',
         model: 'llama3.2:3b-instruct-q4_K_M'
       })
     });

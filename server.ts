@@ -71,8 +71,22 @@ async function startServer() {
       
       let response: string;
       
-      if (aiProvider === 'ollama') {
+      // Default to groq if not specified
+      const provider = aiProvider || 'groq';
+      
+      if (provider === 'ollama') {
         const ollamaBaseUrl = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
+        
+        // Check if Ollama is available
+        try {
+          const testConn = await fetch(`${ollamaBaseUrl}/api/tags`, { method: 'GET' }).catch(() => null);
+          if (!testConn) {
+            throw new Error('Ollama not available');
+          }
+        } catch {
+          // Fallback to Groq if Ollama not available
+          console.log('[AI] Ollama not available, falling back to Groq');
+        }
         
         // Check if there's an image in the messages
         let ollamaMessages = messages;
@@ -136,10 +150,23 @@ async function startServer() {
           max_tokens: 1024,
         });
         
-        response = completion.choices[0]?.message?.content || 'No response from AI';
+response = completion.choices[0]?.message?.content || 'No response from AI';
       }
       else {
-        return res.status(400).json({ error: 'Proveedor de IA no soportado' });
+        // Default: Use Groq
+        const groqClient = new Groq({ apiKey: process.env.GROQ_API_KEY || '' });
+        
+        const completion = await groqClient.chat.completions.create({
+          model: 'llama-3.2-90b-vision-preview',
+          messages: [
+            ...(systemPrompt ? [{ role: 'system' as const, content: systemPrompt }] : []),
+            ...(messages || [])
+          ],
+          temperature: 0.7,
+          max_tokens: 1024,
+        });
+        
+        response = completion.choices[0]?.message?.content || 'No response from AI';
       }
       
       res.json({ response });

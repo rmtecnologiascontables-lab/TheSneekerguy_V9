@@ -43,7 +43,7 @@ const MOCK_MESSAGES: Record<string, Message[]> = {
   ]
 };
 
-const getAi = async (messages: { role: string; content: string }[], systemPrompt: string, provider: string = 'ollama', model: string = 'qwen2.5:0.5b') => {
+const getAi = async (messages: { role: string; content: string }[], systemPrompt: string, provider: string = 'groq', model: string = 'llama-3.2-90b-vision-preview') => {
   const res = await fetch('/api/ai/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -140,8 +140,8 @@ export function MessagingView({ settings }: { settings: SystemSettings }) {
       const response = await getAi(
         [{ role: 'user', content: prompt }],
         settings.aiPrimaryPrompt,
-        'ollama',
-        'qwen2.5:0.5b'
+        'groq',
+        'llama-3.2-90b-vision-preview'
       );
       
       const text = response || "Lo siento, tuve un problema procesando tu solicitud.";

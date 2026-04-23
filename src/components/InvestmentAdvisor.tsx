@@ -121,7 +121,7 @@ export function InvestmentAdvisor({ products }: InvestmentAdvisorProps) {
         body: JSON.stringify({
           messages: [...messages.map(m => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content })), { role: 'user', content: userMsg.content }],
           systemPrompt,
-          provider: 'ollama',
+          provider: 'groq',
           model: 'qwen2.5:0.5b'
         })
       });
