@@ -62,109 +62,28 @@ async function startServer() {
   });
 
   // AI Chat Endpoint
-  app.post('/api/ai/chat', async (req, res) => {
+app.post('/api/ai/chat', async (req, res) => {
     try {
-      const { messages, systemPrompt, provider, model } = req.body;
+      const { messages, systemPrompt, model } = req.body;
       
-      const aiProvider = provider || 'groq';
-      const aiModel = model || 'qwen/qwen3-8b';
+      // Always use Groq (works in cloud)
+      const groqClient = new Groq({ apiKey: process.env.GROQ_API_KEY || '' });
       
-      let response: string;
+      if (!process.env.GROQ_API_KEY) {
+        return res.status(500).json({ error: 'GROQ_API_KEY not configured' });
+      }
       
-      if (aiProvider === 'ollama') {
-        const ollamaBaseUrl = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
-        
-        // Check if Ollama is available
-        try {
-          const testConn = await fetch(`${ollamaBaseUrl}/api/tags`, { method: 'GET' }).catch(() => null);
-          if (!testConn) {
-            throw new Error('Ollama not available');
-          }
-        } catch {
-          // Fallback to Groq if Ollama not available
-          console.log('[AI] Ollama not available, falling back to Groq');
-        }
-        
-        // Check if there's an image in the messages
-        let ollamaMessages = messages;
-        if (messages && messages[0]?.images) {
-          // Ollama vision format
-          ollamaMessages = messages.map(m => ({
-            role: m.role,
-            content: m.content,
-            images: m.images
-          }));
-        }
-        
-        const ollamaResponse = await fetch(`${ollamaBaseUrl}/api/chat`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            model: aiModel || 'qwen2.5:0.5b',
-            messages: [
-              { role: 'system', content: systemPrompt || 'You are a helpful assistant.' },
-              ...(ollamaMessages || [])
-            ],
-            stream: false
-          })
-        });
-        
-        if (!ollamaResponse.ok) {
-          throw new Error(`Ollama error: ${ollamaResponse.statusText}`);
-        }
-        
-        const data = await ollamaResponse.json();
-        response = data.message?.content || 'No response from AI';
-      }
-      else if (aiProvider === 'groq') {
-        // Groq with vision support
-        const groqClient = new Groq({ apiKey: process.env.GROQ_API_KEY || '' });
-        
-        // Handle vision format (array content with image_url)
-        const formattedMessages = messages?.map((m: any) => {
-          if (Array.isArray(m.content)) {
-            // Vision format from frontend
-            return {
-              role: m.role,
-              content: m.content.map((c: any) => {
-                if (c.type === 'image_url') {
-                  return { type: 'image_url', image_url: c.image_url };
-                }
-                return { type: 'text', text: c.text };
-              })
-            };
-          }
-          return { role: m.role, content: m.content };
-        }) || [];
-        
-        const completion = await groqClient.chat.completions.create({
-          model: aiModel || 'llama-3.2-90b-vision-preview',
-          messages: [
-            ...(systemPrompt ? [{ role: 'system' as const, content: systemPrompt }] : []),
-            ...formattedMessages
-          ],
-          temperature: 0.7,
-          max_tokens: 1024,
-        });
-        
-response = completion.choices[0]?.message?.content || 'No response from AI';
-      }
-      else {
-        // Default: Use Groq
-        const groqClient = new Groq({ apiKey: process.env.GROQ_API_KEY || '' });
-        
-        const completion = await groqClient.chat.completions.create({
-          model: 'llama-3.2-90b-vision-preview',
-          messages: [
-            ...(systemPrompt ? [{ role: 'system' as const, content: systemPrompt }] : []),
-            ...(messages || [])
-          ],
-          temperature: 0.7,
-          max_tokens: 1024,
-        });
-        
-        response = completion.choices[0]?.message?.content || 'No response from AI';
-      }
+      const completion = await groqClient.chat.completions.create({
+        model: model || 'llama-3.2-90b-vision-preview',
+        messages: [
+          { role: 'system', content: systemPrompt || 'You are a helpful assistant.' },
+          ...(messages || [])
+        ],
+        temperature: 0.7,
+        max_tokens: 1024,
+      });
+      
+      const response = completion.choices[0]?.message?.content || 'No response from AI';
       
       res.json({ response });
     } catch (error: any) {
