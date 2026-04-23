@@ -71,10 +71,7 @@ async function startServer() {
       
       let response: string;
       
-      // Default to groq if not specified
-      const provider = aiProvider || 'groq';
-      
-      if (provider === 'ollama') {
+      if (aiProvider === 'ollama') {
         const ollamaBaseUrl = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
         
         // Check if Ollama is available
