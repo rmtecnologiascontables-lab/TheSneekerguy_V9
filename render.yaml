@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: sneekerguy
+    env: node
+    buildCommand: npm install
+    startCommand: npx tsx server.ts
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: GOOGLE_SERVICE_ACCOUNT_EMAIL
+        sync: false
+      - key: GOOGLE_PRIVATE_KEY
+        sync: false
+      - key: GOOGLE_SHEET_ID
+        sync: false
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: OLLAMA_BASE_URL
+        value: http://localhost:11434
