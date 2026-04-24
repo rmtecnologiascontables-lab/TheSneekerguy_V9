@@ -77,6 +77,9 @@ export function FinanceView({ products, globalMarkup = 35, onUpdateMarkup }: Fin
 
   const COLORS = ['#141414', '#5A5A40', '#F27D26', '#00FF00', '#FF4E00', '#5A5A40'];
 
+  const hasCategoryData = stats.categoryChartData.length > 0;
+  const hasStatusData = stats.statusData.some(s => s.value > 0);
+
   return (
     <div className="space-y-6">
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -183,41 +186,47 @@ export function FinanceView({ products, globalMarkup = 35, onUpdateMarkup }: Fin
               <BarChart3 size={16} /> Inversión por Categoría (MXN)
             </h3>
           </div>
-          <div className="h-[300px] w-full min-h-[300px]">
-            <ResponsiveContainer width="99%" height="100%">
-              <BarChart data={stats.categoryChartData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="currentColor" opacity={0.1} />
-                <XAxis 
-                  dataKey="name" 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{ fontSize: 10, fontWeight: 700, fill: 'var(--brand-muted)' }}
-                />
-                <YAxis 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{ fontSize: 10, fontWeight: 700, fill: 'var(--brand-muted)' }}
-                  tickFormatter={(val) => `$${(val / 1000)}k`}
-                />
-                <Tooltip 
-                  cursor={{ fill: 'var(--brand-bg)' }}
-                  contentStyle={{ 
-                    borderRadius: '12px', 
-                    border: '1px solid var(--brand-border)', 
-                    backgroundColor: 'var(--brand-surface)',
-                    color: 'var(--brand-ink)',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.05)' 
-                  }}
-                  itemStyle={{ color: 'var(--brand-ink)', fontSize: '10px', fontWeight: 700 }}
-                />
-                <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                  {stats.categoryChartData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+          {hasCategoryData ? (
+            <div className="h-[300px] w-full min-h-[300px]">
+              <ResponsiveContainer width="99%" height="100%">
+                <BarChart data={stats.categoryChartData}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="currentColor" opacity={0.1} />
+                  <XAxis 
+                    dataKey="name" 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{ fontSize: 10, fontWeight: 700, fill: 'var(--brand-muted)' }}
+                  />
+                  <YAxis 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{ fontSize: 10, fontWeight: 700, fill: 'var(--brand-muted)' }}
+                    tickFormatter={(val) => `$${(val / 1000)}k`}
+                  />
+                  <Tooltip 
+                    cursor={{ fill: 'var(--brand-bg)' }}
+                    contentStyle={{ 
+                      borderRadius: '12px', 
+                      border: '1px solid var(--brand-border)', 
+                      backgroundColor: 'var(--brand-surface)',
+                      color: 'var(--brand-ink)',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.05)' 
+                    }}
+                    itemStyle={{ color: 'var(--brand-ink)', fontSize: '10px', fontWeight: 700 }}
+                  />
+                  <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                    {stats.categoryChartData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="h-[300px] flex items-center justify-center text-brand-muted text-sm">
+              No hay datos suficientes para mostrar el gráfico
+            </div>
+          )}
         </div>
 
         {/* Global Distribution */}
@@ -231,32 +240,38 @@ export function FinanceView({ products, globalMarkup = 35, onUpdateMarkup }: Fin
               <span className="text-[10px] font-bold">{stats.totalUnits} <span className="opacity-60">UDS</span></span>
             </div>
           </div>
-          <div className="h-[250px] w-full min-h-[250px]">
-            <ResponsiveContainer width="99%" height="100%">
-              <PieChart>
-                <Pie
-                  data={stats.statusData}
-                  innerRadius={60}
-                  outerRadius={80}
-                  paddingAngle={5}
-                  dataKey="value"
-                >
-                  {stats.statusData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} stroke="none" />
-                  ))}
-                </Pie>
-                <Tooltip 
-                   contentStyle={{ 
-                    borderRadius: '12px', 
-                    border: '1px solid var(--brand-border)', 
-                    backgroundColor: 'var(--brand-surface)',
-                    color: 'var(--brand-ink)',
-                    fontSize: '10px'
-                  }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
+          {hasStatusData ? (
+            <div className="h-[250px] w-full min-h-[250px]">
+              <ResponsiveContainer width="99%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={stats.statusData}
+                    innerRadius={60}
+                    outerRadius={80}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {stats.statusData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} stroke="none" />
+                    ))}
+                  </Pie>
+                  <Tooltip 
+                     contentStyle={{ 
+                      borderRadius: '12px', 
+                      border: '1px solid var(--brand-border)', 
+                      backgroundColor: 'var(--brand-surface)',
+                      color: 'var(--brand-ink)',
+                      fontSize: '10px'
+                    }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="h-[250px] flex items-center justify-center text-brand-muted text-sm">
+              No hay productos en inventario
+            </div>
+          )}
           <div className="space-y-3 mt-4">
             {stats.statusData.map((item, idx) => (
               <div key={item.name} className="flex items-center justify-between text-xs font-bold">

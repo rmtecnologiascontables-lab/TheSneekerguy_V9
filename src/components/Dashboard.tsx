@@ -66,6 +66,19 @@ export function Dashboard({ products, onNavigate }: DashboardProps) {
     .slice(0, 8)
     .map(p => ({ name: p.name.split(' ')[0], stock: p.quantity }));
 
+  const hasStatusData = statusData.length > 0 && statusData.some(s => s.value > 0);
+  const hasStockData = stockData.length > 0 && stockData.some(s => s.stock > 0);
+
+  if (!hasStatusData && !hasStockData) {
+    return (
+      <div className="flex flex-col items-center justify-center p-12 text-brand-muted">
+        <Package size={48} className="mb-4 opacity-50" />
+        <p className="text-sm font-medium">No hay productos en inventario</p>
+        <p className="text-xs mt-1">Agrega productos para ver estadísticas</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4 lg:space-y-8">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -99,43 +112,55 @@ export function Dashboard({ products, onNavigate }: DashboardProps) {
           <div className="flex justify-between items-center mb-4 lg:mb-8">
              <h3 className="font-bold text-xs lg:text-sm tracking-tight text-brand-ink">Distribución por Status</h3>
           </div>
-          <div className="flex-1 w-full min-h-[250px]">
-            <ResponsiveContainer width="99%" height="100%">
-              <PieChart>
-                <Pie
-                  data={statusData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={80}
-                  paddingAngle={2}
-                  dataKey="value"
-                >
-                  {statusData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={index === 0 ? '#1A1A1A' : COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
+          {hasStatusData ? (
+            <div className="flex-1 w-full min-h-[250px]">
+              <ResponsiveContainer width="99%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={statusData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={80}
+                    paddingAngle={2}
+                    dataKey="value"
+                  >
+                    {statusData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={index === 0 ? '#1A1A1A' : COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="flex-1 flex items-center justify-center text-brand-muted text-sm">
+              No hay productos en inventario
+            </div>
+          )}
         </div>
 
         <div className="bg-white p-4 lg:p-8 rounded-xl border border-brand-border min-h-[350px] lg:h-[400px] flex flex-col">
           <div className="flex justify-between items-center mb-4 lg:mb-8">
              <h3 className="font-bold text-xs lg:text-sm tracking-tight text-brand-ink">Niveles de Inventario</h3>
           </div>
-          <div className="flex-1 w-full min-h-[250px]">
-            <ResponsiveContainer width="99%" height="100%">
-              <BarChart data={stockData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="currentColor" className="opacity-10" />
-                <XAxis dataKey="name" fontSize={10} tickLine={false} axisLine={false} tick={{fill: 'var(--brand-muted)'}} />
-                <YAxis fontSize={10} tickLine={false} axisLine={false} tick={{fill: 'var(--brand-muted)'}} />
-                <Tooltip cursor={{ fill: 'var(--brand-bg)' }} contentStyle={{ backgroundColor: 'var(--brand-surface)', borderColor: 'var(--brand-border)', color: 'var(--brand-ink)', fontSize: '10px' }} />
-                <Bar dataKey="stock" fill="var(--brand-ink)" radius={[2, 2, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+          {hasStockData ? (
+            <div className="flex-1 w-full min-h-[250px]">
+              <ResponsiveContainer width="99%" height="100%">
+                <BarChart data={stockData}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="currentColor" className="opacity-10" />
+                  <XAxis dataKey="name" fontSize={10} tickLine={false} axisLine={false} tick={{fill: 'var(--brand-muted)'}} />
+                  <YAxis fontSize={10} tickLine={false} axisLine={false} tick={{fill: 'var(--brand-muted)'}} />
+                  <Tooltip cursor={{ fill: 'var(--brand-bg)' }} contentStyle={{ backgroundColor: 'var(--brand-surface)', borderColor: 'var(--brand-border)', color: 'var(--brand-ink)', fontSize: '10px' }} />
+                  <Bar dataKey="stock" fill="var(--brand-ink)" radius={[2, 2, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="flex-1 flex items-center justify-center text-brand-muted text-sm">
+              No hay productos en inventario
+            </div>
+          )}
         </div>
       </div>
     </div>

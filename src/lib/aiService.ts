@@ -1,5 +1,3 @@
-import Groq from 'groq';
-
 export type AIModelProvider = 'groq' | 'ollama' | 'gemini';
 
 export interface AIConfig {
@@ -10,9 +8,9 @@ export interface AIConfig {
 
 export const AI_PROVIDERS = {
   groq: {
-    name: 'Groq (Qwen)',
-    models: ['qwen/qwen3-8b', 'qwen/qwen3-32b', 'llama-3.3-70b-versatile', 'llama-3.1-70b-versatile'],
-    defaultModel: 'qwen/qwen3-8b'
+    name: 'Groq (Llama)',
+    models: ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'mixtral-8x7b-32768', 'gemma2-9b-8192'],
+    defaultModel: 'llama-3.3-70b-versatile'
   },
   ollama: {
     name: 'Ollama (Local)',
@@ -27,7 +25,7 @@ export const AI_PROVIDERS = {
 } as const;
 
 class AIService {
-  private groqClient: Groq | null = null;
+  private groqApiKey: string | null = null;
   private currentProvider: AIModelProvider = 'groq';
   private currentModel: string = AI_PROVIDERS.groq.defaultModel;
 
@@ -36,9 +34,12 @@ class AIService {
   }
 
   private initGroq() {
-    const apiKey = process.env.GROQ_API_KEY;
+    const apiKey = import.meta.env.VITE_GROQ_API_KEY;
     if (apiKey) {
-      this.groqClient = new Groq({ apiKey });
+      this.groqApiKey = apiKey as string;
+      console.log('[AI] Groq API key configured (using direct fetch)');
+    } else {
+      console.warn('[AI] No GROQ_API_KEY found');
     }
   }
 
@@ -65,28 +66,65 @@ class AIService {
           return await this.chatWithGroq(allMessages);
       }
     } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
       console.error('AI Service Error:', error);
-      return await this.fallbackChat(messages, systemPrompt);
+
+      if (errorMsg.includes('not initialized') || errorMsg.includes('not configured') || errorMsg.includes('API key')) {
+        return this.fallbackChat(allMessages);
+      }
+      
+      return this.fallbackChat(allMessages);
     }
   }
 
   private async chatWithGroq(messages: { role: 'user' | 'assistant' | 'system'; content: string }[]): Promise<string> {
-    if (!this.groqClient) {
+    if (!this.groqApiKey) {
       throw new Error('Groq client not initialized');
     }
 
-    const response = await this.groqClient.chat.completions.create({
-      model: this.currentModel,
-      messages: messages,
-      temperature: 0.7,
-      max_tokens: 1024,
+    console.log('[AI] Groq messages:', JSON.stringify(messages));
+
+    const formattedMessages = messages.map(m => {
+      let role: string = 'user';
+      if (m.role === 'system') role = 'system';
+      else if (m.role === 'assistant' || m.role === 'bot') role = 'assistant';
+      else if (m.role === 'user') role = 'user';
+      
+      return {
+        role,
+        content: String(m.content || '')
+      };
     });
 
-    return response.choices[0]?.message?.content || 'No response from AI';
+    console.log('[AI] Groq formatted:', JSON.stringify(formattedMessages));
+
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${this.groqApiKey}`
+      },
+      body: JSON.stringify({
+        model: this.currentModel,
+        messages: formattedMessages,
+        temperature: 0.7,
+        max_tokens: 1024
+      })
+    });
+
+    const responseText = await response.text();
+    
+    if (!response.ok) {
+      throw new Error(`Groq API error: ${response.status} - ${responseText}`);
+    }
+
+    const data = JSON.parse(responseText);
+    return data.choices?.[0]?.message?.content || 'No response from AI';
   }
 
   private async chatWithOllama(messages: { role: 'user' | 'assistant' | 'system'; content: string }[]): Promise<string> {
-    const baseUrl = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
+    const baseUrl = (import.meta.env.VITE_OLLAMA_BASE_URL as string) || 'http://localhost:11434';
+    console.log('[AI] Calling Ollama at:', baseUrl);
     
     const response = await fetch(`${baseUrl}/api/chat`, {
       method: 'POST',
@@ -108,7 +146,7 @@ class AIService {
 
   private async chatWithGemini(messages: { role: 'user' | 'assistant' | 'system'; content: string }[]): Promise<string> {
     const { GoogleGenAI } = await import('@google/genai');
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY as string;
     
     if (!apiKey) {
       throw new Error('Gemini API key not configured');
@@ -129,28 +167,29 @@ class AIService {
     return response.text || 'No response from AI';
   }
 
-  private async fallbackChat(messages: { role: 'user' | 'assistant' | 'system'; content: string }[], systemPrompt?: string): Promise<string> {
+  private async fallbackChat(messages: { role: 'user' | 'assistant' | 'system'; content: string }[]): Promise<string> {
     console.log('[AI] Primary provider failed, trying fallback...');
     
-    if (this.currentProvider !== 'ollama') {
+    const triedProviders = new Set([this.currentProvider]);
+    
+    for (const provider of ['ollama', 'gemini'] as AIModelProvider[]) {
+      if (triedProviders.has(provider)) continue;
+      
       try {
-        this.setProvider('ollama', 'qwen2.5:0.5b');
-        return await this.chat(messages, systemPrompt);
+        this.setProvider(provider);
+        triedProviders.add(provider);
+        
+        if (provider === 'ollama') {
+          return await this.chatWithOllama(messages);
+        } else if (provider === 'gemini') {
+          return await this.chatWithGemini(messages);
+        }
       } catch (e) {
-        console.error('[AI] Ollama fallback failed:', e);
+        console.error(`[AI] ${provider} fallback failed:`, e);
       }
     }
 
-    if (this.currentProvider !== 'gemini') {
-      try {
-        this.setProvider('gemini', 'gemini-2.0-flash');
-        return await this.chat(messages, systemPrompt);
-      } catch (e) {
-        console.error('[AI] Gemini fallback failed:', e);
-      }
-    }
-
-    return 'Lo siento, todos los servicios de IA están temporalmente indisponibles. Por favor, intenta más tarde.';
+    return 'Lo siento, todos los servicios de IA están temporalmente indisponibles. Por favor, verifica las claves API o el servicio de Ollama e intenta más tarde.';
   }
 
   getStatus() {
@@ -158,7 +197,7 @@ class AIService {
       provider: this.currentProvider,
       model: this.currentModel,
       providerName: AI_PROVIDERS[this.currentProvider].name,
-      available: !!this.groqClient || this.currentProvider === 'ollama'
+      available: !!this.groqApiKey
     };
   }
 }
