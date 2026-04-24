@@ -96,8 +96,8 @@ app.post('/api/ai/chat', async (req, res) => {
       };
     });
     
-    // Use available vision model (11b is current)
-    const modelToUse = model || (isVision ? 'llama-3.2-11b-vision-preview' : 'llama-3.3-70b-versatile');
+    // Use available vision model (llama-4-scout is the replacement)
+    const modelToUse = model || (isVision ? 'meta-llama/llama-4-scout-17b-16e-instruct' : 'llama-3.3-70b-versatile');
     
     console.log('[AI] Using model:', modelToUse);
     
