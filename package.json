@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
-    "start": "pwsh -ExecutionPolicy Bypass -File start.ps1",
+    "start": "node --import=tsx server.ts",
     "start:app": "tsx server.ts",
     "start:ollama": "ollama serve",
     "build": "vite build",
