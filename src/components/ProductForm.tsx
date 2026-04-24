@@ -264,7 +264,8 @@ export function ProductForm({
         color_description: ocrData.color_description,
         size: ocrData.size,
         buyPriceUsd: ocrData.buyPriceUsd,
-        buyPriceMxn: Math.round((ocrData.buyPriceUsd || 0) * (initialExchangeRate))
+        buyPriceMxn: Math.round((ocrData.buyPriceUsd || 0) * (commonData.exchangeRate)),
+        imageUrl: base64Image
       });
 
       setOcrModalData(ocrData);
