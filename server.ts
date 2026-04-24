@@ -18,6 +18,10 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
+const isCloudinaryConfigured = () => {
+  return !!(process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET);
+};
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -458,16 +462,25 @@ app.get('/api/ai/status', (req, res) => {
       
       // Helper: Subir imagen base64 a Cloudinary si es necesario
       const uploadImageIfNeeded = async (imageUrl: string): Promise<string> => {
+        console.log('[Products] Verificando imagen:', imageUrl ? `longitud=${imageUrl.length}, esBase64=${imageUrl.includes('data:image')}` : 'vacía');
+        
         // Si ya es una URL válida, devolverla
         if (imageUrl && (imageUrl.startsWith('http://') || imageUrl.startsWith('https://'))) {
+          console.log('[Products] Imagen ya es URL, no se requiere upload');
           return imageUrl;
         }
         
         // Si es base64, subir a Cloudinary
         if (imageUrl && imageUrl.includes('data:image')) {
+          if (!isCloudinaryConfigured()) {
+            console.warn('[Products] Cloudinary no configurado, guardando base64 como fallback');
+            return imageUrl;
+          }
+          
           try {
             const base64Data = imageUrl.split(',')[1] || imageUrl;
             const buffer = Buffer.from(base64Data, 'base64');
+            console.log(`[Products] Subiendo imagen a Cloudinary (${buffer.length} bytes)...`);
             
             const result: any = await new Promise((resolve, reject) => {
               cloudinary.uploader.upload_stream(
@@ -479,7 +492,7 @@ app.get('/api/ai/status', (req, res) => {
               ).end(buffer);
             });
             
-            console.log(`[Products] Imagen subida: ${result.secure_url}`);
+            console.log(`[Products] ✓ Imagen subida exitosamente: ${result.secure_url}`);
             return result.secure_url;
           } catch (err) {
             console.warn('[Products] Error subiendo imagen a Cloudinary:', err);
@@ -487,6 +500,7 @@ app.get('/api/ai/status', (req, res) => {
           }
         }
         
+        console.log('[Products] No se detectó imagen para subir');
         return imageUrl || '';
       };
       
