@@ -74,7 +74,7 @@ app.post('/api/ai/chat', async (req, res) => {
     }
     
     // Check if using vision model
-    const isVision = model?.includes('vision') || model?.includes('90b');
+    const isVision = model?.includes('vision') || model?.includes('90b') || model?.includes('11b');
     
     // Format messages - handle vision content arrays
     const formattedMessages = messages.map((m: any) => {
@@ -96,7 +96,8 @@ app.post('/api/ai/chat', async (req, res) => {
       };
     });
     
-    const modelToUse = model || (isVision ? 'llama-3.2-90b-vision-preview' : 'llama-3.3-70b-versatile');
+    // Use available vision model (11b is current)
+    const modelToUse = model || (isVision ? 'llama-3.2-11b-vision-preview' : 'llama-3.3-70b-versatile');
     
     console.log('[AI] Using model:', modelToUse);
     
