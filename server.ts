@@ -456,7 +456,49 @@ app.get('/api/ai/status', (req, res) => {
       const body = req.body;
       const productsArray = Array.isArray(body) ? body : [body];
       
-      const rowsToAppend = productsArray.map((p, idx) => {
+      // Helper: Subir imagen base64 a Cloudinary si es necesario
+      const uploadImageIfNeeded = async (imageUrl: string): Promise<string> => {
+        // Si ya es una URL válida, devolverla
+        if (imageUrl && (imageUrl.startsWith('http://') || imageUrl.startsWith('https://'))) {
+          return imageUrl;
+        }
+        
+        // Si es base64, subir a Cloudinary
+        if (imageUrl && imageUrl.includes('data:image')) {
+          try {
+            const base64Data = imageUrl.split(',')[1] || imageUrl;
+            const buffer = Buffer.from(base64Data, 'base64');
+            
+            const result: any = await new Promise((resolve, reject) => {
+              cloudinary.uploader.upload_stream(
+                { folder: 'sneeker_pro_inventory', resource_type: 'image' },
+                (error, result) => {
+                  if (error) reject(error);
+                  else resolve(result);
+                }
+              ).end(buffer);
+            });
+            
+            console.log(`[Products] Imagen subida: ${result.secure_url}`);
+            return result.secure_url;
+          } catch (err) {
+            console.warn('[Products] Error subiendo imagen a Cloudinary:', err);
+            return imageUrl; // Guardar el base64 como fallback si falla
+          }
+        }
+        
+        return imageUrl || '';
+      };
+      
+      // Procesar cada producto: subir imagen si es base64
+      const processedProducts = await Promise.all(
+        productsArray.map(async (p) => ({
+          ...p,
+          imageUrl: await uploadImageIfNeeded(p.imageUrl)
+        }))
+      );
+      
+      const rowsToAppend = processedProducts.map((p, idx) => {
         const rowSize = 40; // A to AN (index 39)
         const rowData = new Array(rowSize).fill('');
         
