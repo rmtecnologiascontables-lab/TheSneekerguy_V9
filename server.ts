@@ -8,7 +8,6 @@ import fs from 'fs';
 import multer from 'multer';
 import { Readable } from 'stream';
 import { v2 as cloudinary } from 'cloudinary';
-import Groq from 'groq';
 
 dotenv.config();
 
@@ -63,34 +62,53 @@ async function startServer() {
 
   // AI Chat Endpoint
 app.post('/api/ai/chat', async (req, res) => {
-    try {
-      const { messages, systemPrompt, model } = req.body;
-      
-      // Always use Groq (works in cloud)
-      const groqClient = new Groq({ apiKey: process.env.GROQ_API_KEY || '' });
-      
-      if (!process.env.GROQ_API_KEY) {
-        return res.status(500).json({ error: 'GROQ_API_KEY not configured' });
-      }
-      
-      const completion = await groqClient.chat.completions.create({
-        model: model || 'llama-3.2-90b-vision-preview',
+  try {
+    const { messages, systemPrompt, model } = req.body;
+    
+    // Support both VITE_GROQ_API_KEY and GROQ_API_KEY
+    const groqKey = process.env.VITE_GROQ_API_KEY || process.env.GROQ_API_KEY || '';
+    
+    if (!groqKey) {
+      return res.status(500).json({ error: 'GROQ_API_KEY not configured' });
+    }
+    
+    // Use direct fetch instead of SDK to avoid bugs
+    const formattedMessages = messages.map((m: any) => ({
+      role: m.role === 'system' ? 'system' : m.role === 'assistant' ? 'assistant' : 'user',
+      content: m.content
+    }));
+    
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${groqKey}`
+      },
+      body: JSON.stringify({
+        model: model || 'llama-3.3-70b-versatile',
         messages: [
           { role: 'system', content: systemPrompt || 'You are a helpful assistant.' },
-          ...(messages || [])
+          ...formattedMessages
         ],
         temperature: 0.7,
-        max_tokens: 1024,
-      });
-      
-      const response = completion.choices[0]?.message?.content || 'No response from AI';
-      
-      res.json({ response });
-    } catch (error: any) {
-      console.error('AI Chat error:', error);
-      res.status(500).json({ error: error.message || 'Error en el servicio de IA' });
+        max_tokens: 1024
+      })
+    });
+    
+    if (!response.ok) {
+      const err = await response.text();
+      throw new Error(err);
     }
-  });
+    
+    const data = await response.json();
+    const reply = data.choices?.[0]?.message?.content || 'No response from AI';
+    
+    res.json({ response: reply });
+  } catch (error: any) {
+    console.error('AI Chat error:', error);
+    res.status(500).json({ error: error.message || 'Error en el servicio de IA' });
+  }
+});
 
   // AI Status Endpoint
   app.get('/api/ai/status', (req, res) => {

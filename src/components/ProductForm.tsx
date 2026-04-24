@@ -47,18 +47,18 @@ const STATUSES = ['En Tienda / Boutique', 'Tránsito a Warehouse', 'En Bodega (R
 const CARD_TYPES = ['AMEX CORPORATE', 'VISA BUSINESS', 'MASTERCARD BLACK', 'CITI PREMIER', 'EFECTIVO', 'TRANSFERENCIA', 'OTRO'];
 
 // Helper to extract product info via AI (OCR)
-// Use runtime env from window (set by server)
 const getRuntimeEnv = () => (window as any).__ENV__ || {};
 
 const extractProductFromImage = async (base64Image: string) => {
   const env = getRuntimeEnv();
-  const groqKey = import.meta.env.VITE_GROQ_API_KEY || env.GROQ_API_KEY || '';
+  const groqKey = import.meta.env.VITE_GROQ_API_KEY || env.VITE_GROQ_API_KEY || '';
   
-  // Try Groq with vision first, fallback to Ollama
-  const tryGroq = async () => {
-    const groqKey = process.env.VITE_GROQ_API_KEY;
-    if (!groqKey) return null;
-    
+  if (!groqKey) {
+    console.error('Missing GROQ_API_KEY');
+    return {};
+  }
+  
+  try {
     const res = await fetch('/api/ai/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -70,53 +70,34 @@ const extractProductFromImage = async (base64Image: string) => {
             { type: 'image_url', image_url: { url: base64Image } }
           ]
         }],
-        provider: 'groq',
         model: 'llama-3.2-90b-vision-preview'
       })
     });
     
-    if (!res.ok) return null;
-    const data = await res.json();
-    return JSON.parse(data.response || '{}');
-  };
-  
-  const tryOllamaVision = async () => {
-    const res = await fetch('/api/ai/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        messages: [{
-          role: 'user',
-          content: 'Describe esta imagen en detalle para identificar: modelo, marca, categoria, genero, color, talla, precio. Responde en JSON: {modelo, marca, categoria, genero, color, talla, precio_compra}',
-          images: [base64Data]
-        }],
-        provider: 'groq',
-        model: 'llama3.2:3b-instruct-q4_K_M'
-      })
-    });
-    
-    if (!res.ok) return null;
-    const data = await res.json();
-    try {
-      return JSON.parse(data.response || '{}');
-    } catch {
-      return { response: data.response };
+    if (!res.ok) {
+      console.error('AI OCR failed:', res.status);
+      return {};
     }
-  };
-  
-  // Try Groq first (has better vision)
-  try {
-    const result = await tryGroq();
-    if (result && (result.modelo || result.marca)) return result;
-  } catch (e) { console.warn('Groq vision failed'); }
-  
-  // Fallback to Ollama
-  try {
-    const result = await tryOllamaVision();
-    if (result) return result;
-  } catch (e) { console.warn('Ollama vision failed'); }
-  
-  return {};
+    
+    const data = await res.json();
+    const response = data.response || '';
+    
+    // Try to parse JSON from response
+    try {
+      // Find JSON in response
+      const jsonMatch = response.match(/\{[^}]+\}/);
+      if (jsonMatch) {
+        return JSON.parse(jsonMatch[0]);
+      }
+    } catch {
+      console.error('Failed to parse JSON:', response);
+    }
+    
+    return {};
+  } catch (e) {
+    console.error('AI OCR error:', e);
+    return {};
+  }
 };
 
 export function ProductForm({ 
