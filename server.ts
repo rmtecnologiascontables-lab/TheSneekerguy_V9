@@ -73,11 +73,32 @@ app.post('/api/ai/chat', async (req, res) => {
       return res.status(500).json({ error: 'GROQ_API_KEY not configured' });
     }
     
-    // Use direct fetch instead of SDK to avoid bugs
-    const formattedMessages = messages.map((m: any) => ({
-      role: m.role === 'system' ? 'system' : m.role === 'assistant' ? 'assistant' : 'user',
-      content: m.content
-    }));
+    // Check if using vision model
+    const isVision = model?.includes('vision') || model?.includes('90b');
+    
+    // Format messages - handle vision content arrays
+    const formattedMessages = messages.map((m: any) => {
+      if (Array.isArray(m.content)) {
+        // Vision message with text + image
+        return {
+          role: m.role === 'system' ? 'system' : m.role === 'assistant' ? 'assistant' : 'user',
+          content: m.content.map((c: any) => {
+            if (c.type === 'image_url') {
+              return { type: 'image_url', image_url: { url: c.image_url?.url || c.image_url } };
+            }
+            return c;
+          })
+        };
+      }
+      return {
+        role: m.role === 'system' ? 'system' : m.role === 'assistant' ? 'assistant' : 'user',
+        content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content)
+      };
+    });
+    
+    const modelToUse = model || (isVision ? 'llama-3.2-90b-vision-preview' : 'llama-3.3-70b-versatile');
+    
+    console.log('[AI] Using model:', modelToUse);
     
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
@@ -86,7 +107,7 @@ app.post('/api/ai/chat', async (req, res) => {
         'Authorization': `Bearer ${groqKey}`
       },
       body: JSON.stringify({
-        model: model || 'llama-3.3-70b-versatile',
+        model: modelToUse,
         messages: [
           { role: 'system', content: systemPrompt || 'You are a helpful assistant.' },
           ...formattedMessages
@@ -98,6 +119,7 @@ app.post('/api/ai/chat', async (req, res) => {
     
     if (!response.ok) {
       const err = await response.text();
+      console.error('[AI] Groq error:', err);
       throw new Error(err);
     }
     
@@ -111,17 +133,17 @@ app.post('/api/ai/chat', async (req, res) => {
   }
 });
 
-  // AI Status Endpoint
-  app.get('/api/ai/status', (req, res) => {
-    const groqKey = process.env.GROQ_API_KEY;
-    const hasGroq = !!groqKey && groqKey.length > 0;
-    
-    res.json({
-      groq: { available: hasGroq, keyPrefix: hasGroq ? groqKey.substring(0, 8) + '...' : null },
-      ollama: { available: true, baseUrl: process.env.OLLAMA_BASE_URL || 'http://localhost:11434' },
-      gemini: { available: false, note: 'Gemini es el último recurso' }
-    });
+// AI Status Endpoint
+app.get('/api/ai/status', (req, res) => {
+  const groqKey = process.env.VITE_GROQ_API_KEY || process.env.GROQ_API_KEY;
+  const hasGroq = !!groqKey && groqKey.length > 0;
+  
+  res.json({
+    groq: { available: hasGroq, keyPrefix: hasGroq ? groqKey.substring(0, 8) + '...' : null },
+    ollama: { available: false, note: 'Ollama no disponible en producción' },
+    gemini: { available: false, note: 'Gemini es el último recurso' }
   });
+});
 
   // Google Sheets Auth Setup
   const SHEET_ID = process.env.GOOGLE_SHEET_ID || '1yTp-53mSv89l3LALHDlYevqeYk2AqhwUc8CiCBEN7ss';
