@@ -624,17 +624,28 @@ export function ProductForm({
               {!product && (
                 <div className="px-6 py-4 border-b border-brand-border flex items-center justify-between shrink-0 bg-white z-10">
                   <div className="flex items-center gap-3 overflow-x-auto scrollbar-hide">
-                    {items.map((_, idx) => (
+                    {items.map((item, idx) => (
                       <div key={idx} className="relative group shrink-0">
                         <button
                           type="button"
                           onClick={() => setActiveItemIndex(idx)}
                           className={cn(
-                            "px-4 py-2 rounded-lg text-[10px] font-black tracking-widest transition-all min-w-[80px]",
+                            "px-2 py-2 rounded-lg text-[10px] font-black tracking-widest transition-all min-w-[70px] flex flex-col items-center gap-1",
                             activeItemIndex === idx ? "bg-brand-ink text-white shadow-lg shadow-black/10" : "bg-[#F8FAF9] text-brand-muted border border-brand-border hover:border-brand-ink"
                           )}
                         >
-                          ÍTEM {idx + 1}
+                          {item.imageUrl ? (
+                            <img 
+                              src={item.imageUrl} 
+                              alt="" 
+                              className="w-10 h-10 rounded-md object-cover border border-white/20"
+                            />
+                          ) : (
+                            <div className="w-10 h-10 rounded-md bg-gray-200 flex items-center justify-center">
+                              <ImageIcon size={16} className="text-gray-400" />
+                            </div>
+                          )}
+                          <span className="text-[8px]">ÍTEM {idx + 1}</span>
                         </button>
                         {items.length > 1 && (
                           <button
