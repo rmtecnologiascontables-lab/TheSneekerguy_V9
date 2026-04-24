@@ -478,9 +478,17 @@ app.get('/api/ai/status', (req, res) => {
           }
           
           try {
-            const base64Data = imageUrl.split(',')[1] || imageUrl;
+            let base64Data = imageUrl;
+            if (imageUrl.includes(',')) {
+              base64Data = imageUrl.split(',')[1];
+            }
             const buffer = Buffer.from(base64Data, 'base64');
             console.log(`[Products] Subiendo imagen a Cloudinary (${buffer.length} bytes)...`);
+            
+            if (buffer.length === 0) {
+              console.warn('[Products] Buffer vacío, guardando como fallback');
+              return imageUrl;
+            }
             
             const result: any = await new Promise((resolve, reject) => {
               cloudinary.uploader.upload_stream(
@@ -496,7 +504,8 @@ app.get('/api/ai/status', (req, res) => {
             return result.secure_url;
           } catch (err) {
             console.warn('[Products] Error subiendo imagen a Cloudinary:', err);
-            return imageUrl; // Guardar el base64 como fallback si falla
+            console.log('[Products] Guardando base64 como fallback (puede causar error 50k chars)');
+            return imageUrl; // Guardar el base64 como fallback
           }
         }
         
@@ -572,7 +581,8 @@ app.get('/api/ai/status', (req, res) => {
       res.json({ success: true, count: rowsToAppend.length });
     } catch (error: any) {
       console.error('Error adding product:', error);
-      res.status(500).json({ error: error.message });
+      console.error('Error stack:', error.stack);
+      res.status(500).json({ error: error.message, stack: error.stack });
     }
   });
 
