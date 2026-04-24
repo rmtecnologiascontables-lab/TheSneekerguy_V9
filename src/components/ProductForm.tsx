@@ -49,6 +49,24 @@ const CARD_TYPES = ['AMEX CORPORATE', 'VISA BUSINESS', 'MASTERCARD BLACK', 'CITI
 // Helper to extract product info via AI (OCR)
 const getRuntimeEnv = () => (window as any).__ENV__ || {};
 
+// Compress image to reduce size
+const compressImage = (base64: string, maxWidth = 800): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const ratio = Math.min(maxWidth / img.width, maxWidth / img.height);
+      canvas.width = img.width * ratio;
+      canvas.height = img.height * ratio;
+      const ctx = canvas.getContext('2d');
+      ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL('image/jpeg', 0.7));
+    };
+    img.onerror = reject;
+    img.src = base64;
+  });
+};
+
 const extractProductFromImage = async (base64Image: string) => {
   const env = getRuntimeEnv();
   const groqKey = import.meta.env.VITE_GROQ_API_KEY || env.VITE_GROQ_API_KEY || '';
@@ -59,6 +77,10 @@ const extractProductFromImage = async (base64Image: string) => {
   }
   
   try {
+    // Compress image first
+    const compressed = await compressImage(base64Image);
+    console.log('Compressed image size:', Math.round(compressed.length / 1024), 'KB');
+    
     const res = await fetch('/api/ai/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -67,7 +89,7 @@ const extractProductFromImage = async (base64Image: string) => {
           role: 'user',
           content: [
             { type: 'text', text: 'Analiza esta imagen de etiqueta/producto y extrae en JSON válido: modelo, marca, categoria (CALZADO, ACCESORIOS, STREETWEAR, COLECCIONABLES), genero (HOMBRE, MUJER, UNISEX, KIDS), color, talla, precio_compra USD. Responde SOLO JSON.' },
-            { type: 'image_url', image_url: { url: base64Image } }
+            { type: 'image_url', image_url: { url: compressed } }
           ]
         }],
         model: 'llama-3.2-90b-vision-preview'
