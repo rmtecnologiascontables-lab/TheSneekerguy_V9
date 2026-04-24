@@ -43,7 +43,7 @@ const MOCK_MESSAGES: Record<string, Message[]> = {
   ]
 };
 
-const getAi = async (messages: { role: string; content: string }[], systemPrompt: string, provider: string = 'groq', model: string = 'llama-3.2-90b-vision-preview') => {
+const getAi = async (messages: { role: string; content: string }[], systemPrompt: string, provider: string = 'groq', model: string = 'meta-llama/llama-4-scout-17b-16e-instruct') => {
   const res = await fetch('/api/ai/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -141,7 +141,7 @@ export function MessagingView({ settings }: { settings: SystemSettings }) {
         [{ role: 'user', content: prompt }],
         settings.aiPrimaryPrompt,
         'groq',
-        'llama-3.2-90b-vision-preview'
+        'meta-llama/llama-4-scout-17b-16e-instruct'
       );
       
       const text = response || "Lo siento, tuve un problema procesando tu solicitud.";

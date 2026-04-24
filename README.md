@@ -26,7 +26,7 @@ Sistema de gestión de inventario para Sneakers con IA.
 
 ## AI Models
 
-- **Groq** (recomendado): `llama-3.2-90b-vision-preview` para OCR/imágenes
+- **Groq** (recomendado): `meta-llama/llama-4-scout-17b-16e-instruct` para OCR/imágenes
 - **Ollama**: Modelos locales como `llama3.2:3b-instruct-q4_K_M`
 
 ## Deploy a Vercel
