@@ -29,6 +29,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { Product, Customer } from '../types';
 import { cn } from '../lib/utils';
+import { OCRModal } from './OCRModal';
 
 interface ProductFormProps {
   product?: Product | null;
@@ -126,7 +127,7 @@ export function ProductForm({
   product, 
   onSave, 
   onClose, 
-  exchangeRate: initialExchangeRate = 20.00,
+  exchangeRate: initialExchangeRate = 18.00,
   customers = [],
   boutiques = [],
   masterCategories = [],
@@ -173,6 +174,17 @@ export function ProductForm({
   const [customerSearch, setCustomerSearch] = useState('');
   const [showCustomerSearch, setShowCustomerSearch] = useState(false);
   const [globalMarkup, setGlobalMarkup] = useState(initialGlobalMarkup);
+  const [showOCRModal, setShowOCRModal] = useState(false);
+  const [modalImageUrl, setModalImageUrl] = useState('');
+  const [ocrModalData, setOcrModalData] = useState({
+    category: '',
+    brand: '',
+    name: '',
+    gender: 'UNISEX',
+    color_description: '',
+    size: '',
+    buyPriceUsd: 0,
+  });
 
   const currentItem = items[activeItemIndex];
 
@@ -213,11 +225,8 @@ export function ProductForm({
     setItems(updatedItems);
   };
 
-  useEffect(() => {
-    if (!product) {
-      fetchExchangeRate();
-    }
-  }, []);
+  // El tipo de cambio se mantiene fijo. Solo se actualiza manualmente al presionar "Actualizar"
+  // useEffect(() => {}, []);
 
   // OCR scanning with AI
   const scanImageWithAI = async (base64Image: string) => {
@@ -237,16 +246,30 @@ export function ProductForm({
         return;
       }
 
-      updateItem(activeItemIndex, {
-        name: data.modelo || currentItem.name,
-        brand: data.marca || currentItem.brand,
+      const ocrData = {
         category: data.categoria || currentItem.category,
+        brand: data.marca || currentItem.brand,
+        name: data.modelo || currentItem.name,
         gender: data.genero || currentItem.gender,
         color_description: data.color || currentItem.color_description,
         size: data.talla || currentItem.size,
         buyPriceUsd: parseFloat(data.precio_compra) || currentItem.buyPriceUsd,
-        buyPriceMxn: Math.round((parseFloat(data.precio_compra) || 0) * (initialExchangeRate))
+      };
+
+      updateItem(activeItemIndex, {
+        name: ocrData.name,
+        brand: ocrData.brand,
+        category: ocrData.category,
+        gender: ocrData.gender,
+        color_description: ocrData.color_description,
+        size: ocrData.size,
+        buyPriceUsd: ocrData.buyPriceUsd,
+        buyPriceMxn: Math.round((ocrData.buyPriceUsd || 0) * (initialExchangeRate))
       });
+
+      setOcrModalData(ocrData);
+      setModalImageUrl(base64Image);
+      setShowOCRModal(true);
     } catch (error) {
       console.error("AI Scan failed:", error);
     } finally {
@@ -372,6 +395,19 @@ export function ProductForm({
 
   const globalTotalUsd = items.reduce((sum, item) => sum + (item.quantity * item.buyPriceUsd), 0);
   const globalTotalMxn = items.reduce((sum, item) => sum + (item.quantity * item.buyPriceMxn), 0);
+
+  const handleOCRModalSave = (data: any) => {
+    updateItem(activeItemIndex, {
+      category: data.category,
+      brand: data.brand,
+      name: data.name,
+      gender: data.gender,
+      color_description: data.color_description,
+      size: data.size,
+      buyPriceUsd: data.buyPriceUsd,
+      buyPriceMxn: Math.round((data.buyPriceUsd || 0) * (commonData.exchangeRate))
+    });
+  };
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 lg:p-0">
@@ -628,22 +664,46 @@ export function ProductForm({
                 <main className="grid grid-cols-1 xl:grid-cols-12 gap-10">
                   {/* Left Column: Image & OCR */}
                   <div className="xl:col-span-4 space-y-6">
-                    <div className="relative group aspect-square rounded-3xl border-2 border-dashed border-gray-200 bg-gray-50/50 flex flex-col items-center justify-center p-8 transition-all hover:border-brand-ink/30 overflow-hidden">
+                    <div className="relative group aspect-square rounded-3xl border-2 border-dashed border-gray-200 bg-gray-50/50 flex flex-col items-center justify-center p-4 transition-all hover:border-brand-ink/30 overflow-hidden shadow-inner">
                       {currentItem.imageUrl ? (
-                        <div className="absolute inset-0">
+                        <div 
+                          className="absolute inset-0 flex items-center justify-center"
+                          onClick={() => {
+                            setModalImageUrl(currentItem.imageUrl);
+                            setOcrModalData({
+                              category: currentItem.category,
+                              brand: currentItem.brand,
+                              name: currentItem.name,
+                              gender: currentItem.gender,
+                              color_description: currentItem.color_description,
+                              size: currentItem.size,
+                              buyPriceUsd: currentItem.buyPriceUsd,
+                            });
+                            setShowOCRModal(true);
+                          }}
+                        >
                           <img 
                             src={currentItem.imageUrl} 
                             alt="Product preview" 
-                            className="w-full h-full object-contain"
+                            className="w-full h-full object-contain p-2 cursor-zoom-in"
                           />
-                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 backdrop-blur-sm">
-                            <button 
-                              type="button"
-                              onClick={() => updateItem(activeItemIndex, { imageUrl: '' })}
-                              className="p-3 rounded-full bg-red-500 text-white hover:scale-110 transition-transform"
-                            >
-                              <X size={20} />
-                            </button>
+                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all flex items-center justify-center">
+                            <div className="p-3 rounded-full bg-white/90 text-brand-ink shadow-lg opacity-0 group-hover:opacity-100 transition-all scale-75 group-hover:scale-100 transform cursor-zoom-in">
+                              <Search size={22} />
+                            </div>
+                          </div>
+                          <button 
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              updateItem(activeItemIndex, { imageUrl: '' });
+                            }}
+                            className="absolute top-3 right-3 p-2 rounded-full bg-red-500 text-white hover:scale-110 transition-transform opacity-0 group-hover:opacity-100 shadow-lg"
+                          >
+                            <X size={16} />
+                          </button>
+                          <div className="absolute bottom-3 left-3 px-3 py-1.5 bg-brand-ink/80 backdrop-blur-sm rounded-full text-white text-[9px] font-black uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-all">
+                            Toca para ampliar y verificar OCR
                           </div>
                         </div>
                       ) : (
@@ -986,6 +1046,16 @@ export function ProductForm({
             </div>
           </footer>
         </form>
+
+        <OCRModal
+          imageUrl={modalImageUrl}
+          ocrData={ocrModalData}
+          isOpen={showOCRModal}
+          onClose={() => setShowOCRModal(false)}
+          onSave={handleOCRModalSave}
+          itemIndex={activeItemIndex}
+          totalItems={items.length}
+        />
       </motion.div>
     </div>
   );
