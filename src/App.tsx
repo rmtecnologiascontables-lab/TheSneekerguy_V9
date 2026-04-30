@@ -33,7 +33,8 @@ import {
   AlertTriangle,
   MessageSquare,
   Sun,
-  Moon
+  Moon,
+  ShoppingCart,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Product, OrderStatus, CustomerOrder, Customer, Category } from './types';
@@ -51,10 +52,21 @@ import { TrackingManager } from './components/TrackingManager';
 import { TrackingView } from './components/TrackingView';
 import { SystemSettings } from './components/SystemSettings';
 import { SneekyBot } from './components/SneekyBot';
+import { BuscadorSneaker } from './components/BuscadorSneaker';
+import { ClientesPage } from './components/ClientesPage';
 import { cn, formatCurrency, formatDate, exportToCSV } from './lib/utils';
 import { SystemSettings as SettingsType } from './types';
 
-type ActiveTab = 'dashboard' | 'all' | 'pending' | 'delivered' | 'stock' | 'zafi' | 'orders' | 'finances' | 'settings' | 'catalog' | 'messaging' | 'advisor';
+type ActiveTab = 'dashboard' | 'all' | 'pending' | 'delivered' | 'stock' | 'zafi' | 'orders' | 'finances' | 'settings' | 'catalog' | 'messaging' | 'advisor' | 'search' | 'clientes' | 'estatus';
+
+const STATUSES = [
+  { id: 'COMPRADO', label: 'Comprado en USA', icon: '📦', color: '#3B82F6' },
+  { id: 'EN_RUTA', label: 'En Ruta a Zafi', icon: '✈️', color: '#EAB308' },
+  { id: 'EN_BODEGA', label: 'Recibido en Zafi', icon: '📍', color: '#F97316' },
+  { id: 'ENVIADO', label: 'Enviado a México', icon: '🚚', color: '#A855F7' },
+  { id: 'ENTREGADO', label: 'Entregado', icon: '✅', color: '#22C55E' },
+] as const;
+
 type ViewType = 'visual' | 'excel';
 
 export default function App() {
@@ -64,6 +76,7 @@ export default function App() {
   const [categories, setCategories] = React.useState<Category[]>(INITIAL_CATEGORIES);
   const [isLoading, setIsLoading] = React.useState(true);
   const [activeTab, setActiveTab] = React.useState<ActiveTab>('dashboard');
+  const [selectedStatus, setSelectedStatus] = React.useState<string | null>(null);
   const [autoExport, setAutoExport] = React.useState(false);
   const [globalMarkup, setGlobalMarkup] = React.useState(35); // Default 35% markup
   const [theme, setTheme] = React.useState<'light' | 'dark'>('light');
@@ -122,6 +135,7 @@ export default function App() {
 
   const [selectedCategoryId, setSelectedCategoryId] = React.useState<string | null>(null);
   const [trackingProduct, setTrackingProduct] = React.useState<Product | null>(null);
+  const [toast, setToast] = React.useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   // Check for tracking URL param
   const trackingId = new URLSearchParams(window.location.search).get('tracking');
@@ -245,7 +259,8 @@ export default function App() {
                            p.tags?.some(t => t.toLowerCase().includes(searchQuery.toLowerCase())) ||
                            p.clientName?.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesStatus = statusFilter === 'ALL' || p.currentStatus === statusFilter;
-      return matchesSearch && matchesStatus;
+      const matchesEstatus = !selectedStatus || p.currentStatus === selectedStatus;
+      return matchesSearch && matchesStatus && matchesEstatus;
     });
 
     switch (activeTab) {
@@ -311,6 +326,9 @@ export default function App() {
         if (response.ok) {
           // Result is bulk, easiest is to reload all data to get fresh IDs
           await loadData();
+          const amount = Array.isArray(data) ? data.reduce((s, p) => s + (p.buyPriceMxn || 0) * (p.quantity || 1), 0) : (data.buyPriceMxn || 0) * (data.quantity || 1);
+          setToast({ message: `¡Registro Exitoso! Dashboard actualizado con +$${Math.round(amount).toLocaleString()} MXN`, type: 'success' });
+          setTimeout(() => setToast(null), 4000);
         } else {
           const err = await response.json();
           alert(`Error al guardar en Google Sheets: ${err.error}`);
@@ -416,6 +434,53 @@ export default function App() {
               label="Finanzas" 
             />
             <div className="pt-4 pb-2">
+              <span className="px-4 text-[10px] font-bold text-brand-label uppercase tracking-widest">Estatus</span>
+            </div>
+            
+            {/* Status Flow - Accordion Style */}
+            <div className="px-2 py-2 space-y-1">
+              {STATUSES.map((status, idx) => {
+                const isActive = selectedStatus === status.id;
+                const count = products.filter(p => p.currentStatus === status.id).length;
+                return (
+                  <button
+                    key={status.id}
+                    onClick={() => {
+                      setSelectedStatus(isActive ? null : status.id);
+                      setActiveTab('all');
+                      if(window.innerWidth < 1024) setIsSidebarOpen(false);
+                    }}
+                    className={`
+                      w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-all
+                      ${isActive ? 'bg-white/10 border-l-2' : 'hover:bg-white/5 border-l-2 border-transparent'}
+                    `}
+                    style={{ 
+                      borderColor: isActive ? status.color : 'transparent',
+                      marginLeft: `${idx * 8}px`
+                    }}
+                    aria-pressed={isActive}
+                  >
+                    <span className="text-lg">{status.icon}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className={`text-xs font-bold truncate ${isActive ? 'text-white' : 'text-gray-400'}`}>
+                        {status.label}
+                      </div>
+                      <div className="text-[10px]" style={{ color: status.color }}>
+                        {count} items
+                      </div>
+                    </div>
+                    {isActive && (
+                      <div 
+                        className="w-2 h-2 rounded-full animate-pulse" 
+                        style={{ backgroundColor: status.color }}
+                      />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            
+            <div className="pt-4 pb-2">
               <span className="px-4 text-[10px] font-bold text-brand-label uppercase tracking-widest">Vistas de Control</span>
             </div>
             <NavItem 
@@ -451,9 +516,21 @@ export default function App() {
               label="Filtro Zafi (USA)" 
             />
             <NavItem 
+              active={activeTab === 'search'} 
+              onClick={() => { setActiveTab('search'); if(window.innerWidth < 1024) setIsSidebarOpen(false); }} 
+              icon={<Search size={18} />} 
+              label="Buscador Sneeker" 
+            />
+            <NavItem 
+              active={activeTab === 'clientes'} 
+              onClick={() => { setActiveTab('clientes'); if(window.innerWidth < 1024) setIsSidebarOpen(false); }} 
+              icon={<Users size={18} />} 
+              label="Gestión de Clientes" 
+            />
+            <NavItem 
               active={activeTab === 'orders'} 
               onClick={() => { setActiveTab('orders'); if(window.innerWidth < 1024) setIsSidebarOpen(false); }} 
-              icon={<Users size={18} />} 
+              icon={<ShoppingCart size={18} />} 
               label="Órdenes de Clientes" 
               badge={customerOrders.length}
             />
@@ -649,6 +726,31 @@ export default function App() {
             />
           )}
 
+          {!isLoading && activeTab === 'browser' && (
+            <div className="flex-1 flex items-center justify-center bg-gray-900">
+              <p className="text-gray-500">Sección en construcción</p>
+            </div>
+          )}
+
+          {!isLoading && activeTab === 'clientes' && (
+            <ClientesPage 
+              customers={customers} 
+              products={products}
+              onRefresh={() => {}}
+              isLoading={isLoading}
+              onNavigateToProduct={(productId) => {
+                setEditingProduct(products.find(p => p.id === productId) || null);
+                setIsFormOpen(true);
+              }}
+            />
+          )}
+
+          {!isLoading && activeTab === 'search' && (
+            <BuscadorSneaker onNavigate={setActiveTab} />
+          )}
+
+          <Toast toast={toast} onClose={() => setToast(null)} />
+
           {!isLoading && activeTab === 'orders' && (
             <div className="bg-brand-surface border border-brand-border rounded-xl shadow-sm overflow-hidden overflow-x-auto scrollbar-hide">
               <table className="w-full border-collapse text-[11px] lg:text-xs min-w-[600px]">
@@ -807,7 +909,7 @@ export default function App() {
                                 exit={{ height: 0, opacity: 0 }}
                                 className="overflow-hidden"
                               >
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pt-2 pb-6 px-1">
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 pt-2 pb-6 px-1">
                                   {items.map((product) => (
                                     <motion.div
                                       key={product.id}
@@ -835,7 +937,7 @@ export default function App() {
                     )}
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
                     <AnimatePresence mode="popLayout">
                       {filteredProducts.map((product) => (
                         <motion.div
@@ -1285,14 +1387,15 @@ export default function App() {
           />
         )}
         {isFormOpen && (
-          <ProductForm 
+<ProductForm 
             product={editingProduct} 
             customers={customers}
             boutiques={Array.from(new Set(products.map(p => p.boutique).filter(Boolean))) as string[]}
             masterCategories={categories}
             globalMarkup={globalMarkup}
             onSave={handleSaveProduct} 
-            onClose={() => { setIsFormOpen(false); setEditingProduct(undefined); }} 
+            onClose={() => { setIsFormOpen(false); setEditingProduct(undefined); }}
+            onRefresh={() => fetch('/api/customers').then(r => r.json()).then(data => setCustomers(data)).catch(console.error)}
           />
         )}
         {isBulkUploadOpen && (
@@ -1403,5 +1506,32 @@ function SettingsRow({ title, value }: { title: string, value: string }) {
       <span className="text-xs font-bold text-brand-muted">{title}</span>
       <span className="text-xs font-mono font-bold text-brand-ink">{value}</span>
     </div>
+  );
+}
+
+function Toast({ toast, onClose }: { toast: { message: string; type: 'success' | 'error' } | null, onClose: () => void }) {
+  React.useEffect(() => {
+    if (toast) {
+      const t = setTimeout(onClose, 4000);
+      return () => clearTimeout(t);
+    }
+  }, [toast, onClose]);
+
+  if (!toast) return null;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 50 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 50 }}
+      className={cn(
+        "fixed bottom-6 left-1/2 -translate-x-1/2 px-6 py-3 rounded-xl shadow-2xl z-50 font-bold text-sm",
+        toast.type === "success" 
+          ? "bg-[#00FF85] text-black" 
+          : "bg-red-500 text-white"
+      )}
+    >
+      {toast.message}
+    </motion.div>
   );
 }

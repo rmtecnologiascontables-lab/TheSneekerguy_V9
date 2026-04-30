@@ -122,7 +122,7 @@ export function InvestmentAdvisor({ products }: InvestmentAdvisorProps) {
           messages: [...messages.map(m => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content })), { role: 'user', content: userMsg.content }],
           systemPrompt,
           provider: 'groq',
-          model: 'qwen2.5:0.5b'
+          model: 'llama-3.3-70b-versatile'
         })
       });
       

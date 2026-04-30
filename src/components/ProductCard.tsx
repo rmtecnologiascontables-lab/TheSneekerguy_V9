@@ -11,9 +11,10 @@ interface ProductCardProps {
   onEdit: (p: Product) => void;
   onStatusChange: (id: string, s: OrderStatus) => void;
   onDelete: (id: string) => void;
+  isHighlighted?: boolean;
 }
 
-export function ProductCard({ product, globalMarkup = 35, onEdit, onStatusChange, onDelete }: ProductCardProps) {
+export function ProductCard({ product, globalMarkup = 35, onEdit, onStatusChange, onDelete, isHighlighted }: ProductCardProps) {
   const [showActions, setShowActions] = React.useState(false);
   const [justUpdated, setJustUpdated] = React.useState(false);
 
@@ -65,7 +66,11 @@ export function ProductCard({ product, globalMarkup = 35, onEdit, onStatusChange
         boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.15)"
       }}
       whileTap={{ scale: 0.98 }}
-      className="bg-brand-surface border border-brand-border rounded-xl overflow-hidden flex flex-col h-full hover:border-brand-ink/40 transition-all group shadow-sm"
+      id={isHighlighted ? `product-${product.id}` : undefined}
+      className={cn(
+        "bg-brand-surface border rounded-xl overflow-hidden flex flex-col h-full hover:border-brand-ink/40 transition-all group shadow-sm",
+        isHighlighted && "border-[#00FF85] shadow-[0_0_20px_rgba(0,255,133,0.4)] ring-2 ring-[#00FF85]"
+      )}
     >
       <div className="relative aspect-video bg-brand-bg border-b border-brand-border">
         <img 

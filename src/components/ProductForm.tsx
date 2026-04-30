@@ -24,7 +24,10 @@ import {
   ListFilter,
   ShoppingBag,
   TrendingUp,
-  Info
+  Info,
+  User,
+  Phone,
+  Mail
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Product, Customer } from '../types';
@@ -40,6 +43,7 @@ interface ProductFormProps {
   boutiques?: string[];
   masterCategories?: any[];
   globalMarkup?: number;
+  onRefresh?: () => void;
 }
 
 const CATEGORIES = ['CALZADO', 'ACCESORIOS', 'STREETWEAR', 'COLECCIONABLES', 'OTROS'];
@@ -51,7 +55,7 @@ const CARD_TYPES = ['AMEX CORPORATE', 'VISA BUSINESS', 'MASTERCARD BLACK', 'CITI
 const getRuntimeEnv = () => (window as any).__ENV__ || {};
 
 // Compress image to reduce size
-const compressImage = (base64: string, maxWidth = 800): Promise<string> => {
+const compressImage = (base64: string, maxWidth = 400): Promise<string> => {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => {
@@ -61,7 +65,7 @@ const compressImage = (base64: string, maxWidth = 800): Promise<string> => {
       canvas.height = img.height * ratio;
       const ctx = canvas.getContext('2d');
       ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
-      resolve(canvas.toDataURL('image/jpeg', 0.7));
+      resolve(canvas.toDataURL('image/jpeg', 0.5));
     };
     img.onerror = reject;
     img.src = base64;
@@ -107,10 +111,20 @@ const extractProductFromImage = async (base64Image: string) => {
     
     // Try to parse JSON from response
     try {
-      // Find JSON in response
-      const jsonMatch = response.match(/\{[^}]+\}/);
+      // Find JSON in response - handle nested objects
+      const jsonMatch = response.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]);
+        const parsed = JSON.parse(jsonMatch[0]);
+        
+        // Handle nested price object like {"USD": 25600}
+        if (parsed.precio_compra && typeof parsed.precio_compra === 'object') {
+          const priceValues = Object.values(parsed.precio_compra);
+          if (priceValues.length > 0) {
+            parsed.precio_compra = Number(priceValues[0]) || 0;
+          }
+        }
+        
+        return parsed;
       }
     } catch {
       console.error('Failed to parse JSON:', response);
@@ -141,6 +155,8 @@ export function ProductForm({
     internal_notes: '',
     boutique: '',
     payment_card: '',
+    origen_articulo: 'USA',
+    moneda_compra: 'USD',
   });
 
   // Array of items in this purchase
@@ -173,6 +189,7 @@ export function ProductForm({
   const [isUploading, setIsUploading] = useState(false);
   const [customerSearch, setCustomerSearch] = useState('');
   const [showCustomerSearch, setShowCustomerSearch] = useState(false);
+  const [showNewCustomerModal, setShowNewCustomerModal] = useState(false);
   const [globalMarkup, setGlobalMarkup] = useState(initialGlobalMarkup);
   const [showOCRModal, setShowOCRModal] = useState(false);
   const [modalImageUrl, setModalImageUrl] = useState('');
@@ -676,6 +693,45 @@ export function ProductForm({
                 <main className="grid grid-cols-1 xl:grid-cols-12 gap-10">
                   {/* Left Column: Image & OCR */}
                   <div className="xl:col-span-4 space-y-6">
+                    {/* Tipo de Compra y Moneda - PRIMERO para evitar confusiones */}
+                    <div className="bg-brand-surface border border-brand-border rounded-2xl p-5">
+                      <div className="flex items-center gap-2 text-brand-ink mb-4">
+                        <Tag size={16} className="text-brand-accent" />
+                        <h3 className="text-xs font-black uppercase tracking-wider">Tipo de Compra y Moneda</h3>
+                      </div>
+                      
+                      <div className="flex items-center gap-8">
+                        {/* Origen - Define tanto tipo de compra como moneda */}
+                        <div className="flex-1">
+                          <label className="text-[10px] font-bold text-brand-muted uppercase tracking-widest block mb-2">Origen (Moneda)</label>
+                          <div className="flex gap-2">
+                            {[
+                              { id: 'NACIONAL', emoji: '🇲🇽', currency: 'MXN' },
+                              { id: 'FRONTERA', emoji: '🌵', currency: 'MXN' },
+                              { id: 'USA', emoji: '🇺🇸', currency: 'USD' }
+                            ].map(orig => (
+                              <button
+                                key={orig.id}
+                                type="button"
+                                onClick={() => setCommonData({
+                                  ...commonData, 
+                                  origen_articulo: orig.id,
+                                  moneda_compra: orig.currency
+                                })}
+                                className={`flex-1 px-3 py-2.5 rounded-xl text-[11px] font-bold transition-all ${
+                                  commonData.origen_articulo === orig.id 
+                                    ? 'bg-brand-accent text-white shadow-lg shadow-brand-accent/30' 
+                                    : 'bg-white border-2 border-brand-border text-brand-muted hover:border-brand-ink'
+                                }`}
+                              >
+                                {orig.emoji} {orig.id}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
                     <div className="relative group aspect-square rounded-3xl border-2 border-dashed border-gray-200 bg-gray-50/50 flex flex-col items-center justify-center p-4 transition-all hover:border-brand-ink/30 overflow-hidden shadow-inner">
                       {currentItem.imageUrl ? (
                         <div 
@@ -869,13 +925,22 @@ export function ProductForm({
                           <h3 className="text-xs font-black text-brand-ink uppercase tracking-wider">Asignación de Cliente</h3>
                           <p className="text-[10px] text-brand-muted border-b border-brand-accent/30 inline-block">¿Para quién es este artículo?</p>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => setShowCustomerSearch(!showCustomerSearch)}
-                          className="text-[10px] font-bold text-brand-ink bg-[#F8FAF9] border border-brand-border px-4 py-2 rounded-xl hover:bg-brand-ink hover:text-white transition-all flex items-center gap-2 shadow-sm"
-                        >
-                          <Search size={14} /> {showCustomerSearch ? 'Cerrar Buscador' : 'Seleccionar Cliente'}
-                        </button>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setShowNewCustomerModal(true)}
+                            className="text-[10px] font-bold text-white bg-brand-accent border border-brand-accent px-4 py-2 rounded-xl hover:bg-brand-accent/90 transition-all flex items-center gap-2 shadow-sm"
+                          >
+                            <User size={14} /> Nuevo Cliente
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setShowCustomerSearch(!showCustomerSearch)}
+                            className="text-[10px] font-bold text-brand-ink bg-[#F8FAF9] border border-brand-border px-4 py-2 rounded-xl hover:bg-brand-ink hover:text-white transition-all flex items-center gap-2 shadow-sm"
+                          >
+                            <Search size={14} /> {showCustomerSearch ? 'Cerrar' : 'Buscar'}
+                          </button>
+                        </div>
                       </div>
 
                       {showCustomerSearch && (
@@ -942,39 +1007,65 @@ export function ProductForm({
                         <div className="flex items-center gap-2 text-brand-ink">
                           <Calculator size={16} className="text-brand-accent" />
                           <h3 className="text-xs font-black uppercase tracking-wider">Precio de Compra</h3>
+                          <span className={commonData.moneda_compra === 'MXN' ? 'ml-auto text-[10px] font-bold bg-green-500 text-white px-2 py-1 rounded' : 'ml-auto text-[10px] font-bold bg-blue-600 text-white px-2 py-1 rounded'}>
+                            {commonData.moneda_compra}
+                          </span>
                         </div>
                         
                         <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <label className="text-[10px] font-bold text-brand-muted uppercase tracking-widest">Monto USD (Costo Real)</label>
+                          {commonData.moneda_compra === 'USD' ? (
+                            <div className="space-y-2">
+                              <label className="text-[10px] font-bold text-brand-muted uppercase tracking-widest">Monto USD</label>
+                              <div className="relative">
+                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-muted font-mono text-sm">$</span>
+                                <input 
+                                  type="number" 
+                                  step="0.01"
+                                  required
+                                  value={currentItem.buyPriceUsd || ''}
+                                  onChange={e => {
+                                    const usd = parseFloat(e.target.value) || 0;
+                                    const buyMxn = Math.round(usd * commonData.exchangeRate);
+                                    const sellMxn = Math.round(buyMxn * (1 + (globalMarkup / 100)));
+                                    updateItem(activeItemIndex, { 
+                                      buyPriceUsd: usd,
+                                      buyPriceMxn: buyMxn,
+                                      sellPriceMxn: sellMxn
+                                    });
+                                  }}
+                                  className="w-full pl-8 pr-4 py-3 border border-brand-border rounded-xl text-lg font-mono font-black outline-none focus:border-brand-ink bg-white shadow-inner"
+                                  placeholder="0.00"
+                                />
+                              </div>
+                            </div>
+                          ) : null}
+                          <div className={`space-y-2 ${commonData.moneda_compra === 'MXN' ? 'col-span-2' : ''}`}>
+                            <label className="text-[10px] font-bold text-brand-muted uppercase tracking-widest">
+                              {commonData.moneda_compra === 'MXN' ? 'Monto en Pesos MXN' : 'Costo en MXN'}
+                            </label>
                             <div className="relative">
                               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-muted font-mono text-sm">$</span>
                               <input 
                                 type="number" 
                                 step="0.01"
                                 required
-                                value={currentItem.buyPriceUsd || ''}
+                                value={currentItem.buyPriceMxn || ''}
                                 onChange={e => {
-                                  const usd = parseFloat(e.target.value) || 0;
-                                  const buyMxn = Math.round(usd * commonData.exchangeRate);
-                                  const sellMxn = Math.round(buyMxn * (1 + (globalMarkup / 100)));
+                                  const mxn = parseFloat(e.target.value) || 0;
+                                  const sellMxn = Math.round(mxn * (1 + (globalMarkup / 100)));
                                   updateItem(activeItemIndex, { 
-                                    buyPriceUsd: usd,
-                                    buyPriceMxn: buyMxn,
-                                    sellPriceMxn: sellMxn // Auto suggest based on markup
+                                    buyPriceMxn: mxn,
+                                    buyPriceUsd: commonData.moneda_compra === 'MXN' ? 0 : Math.round(mxn / commonData.exchangeRate * 100) / 100,
+                                    sellPriceMxn: sellMxn
                                   });
                                 }}
                                 className="w-full pl-8 pr-4 py-3 border border-brand-border rounded-xl text-lg font-mono font-black outline-none focus:border-brand-ink bg-white shadow-inner"
                                 placeholder="0.00"
                               />
                             </div>
-                          </div>
-                          <div className="space-y-2">
-                            <label className="text-[10px] font-bold text-brand-muted uppercase tracking-widest italic">Costo en MXN</label>
-                            <div className="w-full px-4 py-3 bg-[#F8FAF9] border border-brand-border rounded-xl text-lg font-mono font-black text-brand-ink/50 flex items-center justify-between">
-                              <span>${(currentItem.buyPriceMxn || 0).toLocaleString()}</span>
-                              <span className="text-[9px] font-bold opacity-30">T.C. {commonData.exchangeRate}</span>
-                            </div>
+                            {commonData.moneda_compra === 'USD' && (
+                              <div className="text-[9px] font-bold opacity-30">T.C. {commonData.exchangeRate}</div>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -986,7 +1077,9 @@ export function ProductForm({
                         </div>
 
                         <div className="space-y-2">
-                          <label className="text-[10px] font-bold text-brand-muted uppercase tracking-widest italic">Venta Final (Editado o Sugerido)</label>
+                          <label className="text-[10px] font-bold text-brand-muted uppercase tracking-widest italic">
+                            Venta Final ({commonData.moneda_compra === 'MXN' ? 'Sugerido en MXN' : 'Sugerido en MXN'})
+                          </label>
                           <div className="relative">
                             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-accent font-mono text-sm">$</span>
                             <input 
@@ -997,16 +1090,18 @@ export function ProductForm({
                               className="w-full pl-8 pr-4 py-3 border-2 border-brand-accent/20 rounded-xl text-2xl font-mono font-black outline-none focus:border-brand-accent bg-brand-accent/5 transition-all text-brand-accent placeholder:text-brand-accent/20 shadow-md"
                             />
                             <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-1 group">
-                               <span className="text-[10px] font-black italic bg-brand-accent text-white px-2 py-0.5 rounded opacity-50 group-hover:opacity-100 transition-opacity">
-                                 {Math.round(((currentItem.sellPriceMxn / currentItem.buyPriceMxn) - 1) * 100) || 0}% GANANCIA
-                               </span>
+                              {currentItem.buyPriceMxn > 0 && (
+                                <span className="text-[10px] font-black italic bg-brand-accent text-white px-2 py-0.5 rounded opacity-50 group-hover:opacity-100 transition-opacity">
+                                  {Math.round(((currentItem.sellPriceMxn / currentItem.buyPriceMxn) - 1) * 100) || 0}% GANANCIA
+                                </span>
+                              )}
                             </div>
                           </div>
                           <div className="flex items-center justify-between px-1">
                             <span className="text-[9px] font-bold text-brand-muted uppercase tracking-widest">Utilidad Proyectada:</span>
                             <span className={cn(
                               "text-[10px] font-black font-mono",
-                              (currentItem.sellPriceMxn - currentItem.buyPriceMxn) > 0 ? "text-green-600" : "text-red-500"
+                              ((currentItem.sellPriceMxn || 0) - (currentItem.buyPriceMxn || 0)) > 0 ? "text-green-600" : ((currentItem.sellPriceMxn || 0) - (currentItem.buyPriceMxn || 0)) < 0 ? "text-red-500" : "text-brand-muted"
                             )}>
                               ${((currentItem.sellPriceMxn || 0) - (currentItem.buyPriceMxn || 0)).toLocaleString()} MXN
                             </span>
@@ -1068,7 +1163,259 @@ export function ProductForm({
           itemIndex={activeItemIndex}
           totalItems={items.length}
         />
+
+        {/* New Customer Modal */}
+<AnimatePresence>
+          {showNewCustomerModal && (
+            <NewCustomerModal
+              onClose={() => setShowNewCustomerModal(false)}
+              onSave={(newCustomer) => {
+                const updatedCustomers = [...customers, { ...newCustomer, id: newCustomer.id || `CUST-${Date.now()}` }];
+                selectCustomer(updatedCustomers.find(c => c.id === newCustomer.id) || newCustomer);
+                setShowNewCustomerModal(false);
+                onRefresh && onRefresh();
+              }}
+            />
+          )}
+        </AnimatePresence>
       </motion.div>
     </div>
+  );
+}
+
+interface NewCustomerModalProps {
+  onClose: () => void;
+  onSave: (customer: Customer) => void;
+}
+
+function NewCustomerModal({ onClose, onSave }: NewCustomerModalProps) {
+  const [formData, setFormData] = useState({
+    id: '',
+    name: '',
+    phone: '',
+    email: '',
+    address: '',
+    ig_handle: '',
+    referido_por: '',
+    notas: '',
+    tipo_de_pago: 'Transferencia',
+  });
+  const [isSaving, setIsSaving] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSaving(true);
+    
+    try {
+      const idCliente = `CUST-${Date.now()}`;
+      
+      const payload = {
+        id_cliente: idCliente,
+        nombre: formData.name,
+        telefono: formData.phone,
+        email: formData.email,
+        direccion: formData.address,
+        ig_handle: formData.ig_handle,
+        referido_por: formData.referido_por,
+        notas: formData.notas,
+        tipo_de_pago: formData.tipo_de_pago,
+      };
+
+      const response = await fetch('/api/clientes/add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (response.ok) {
+        setShowSuccess(true);
+        setTimeout(() => {
+          onSave({
+            id: idCliente,
+            name: formData.name,
+            phone: formData.phone,
+            email: formData.email,
+            address: formData.address,
+            ig_handle: formData.ig_handle,
+            referido_por: formData.referido_por,
+            notes: formData.notas,
+            tipo_de_pago: formData.tipo_de_pago,
+          } as Customer);
+        }, 1000);
+      } else {
+        const err = await response.json();
+        alert(`Error: ${err.error}`);
+      }
+    } catch (error) {
+      console.error('Error saving customer:', error);
+      alert('Error de conexión');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <motion.div 
+        initial={{ scale: 0.95, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.95, opacity: 0 }}
+        onClick={e => e.stopPropagation()}
+        className="bg-brand-surface border border-brand-border rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto"
+      >
+        <div className="p-6 border-b border-brand-border flex items-center justify-between">
+          <h2 className="text-lg font-black text-brand-ink uppercase tracking-tight">
+            Nuevo Cliente
+          </h2>
+          <button 
+            onClick={onClose}
+            className="p-2 rounded-lg text-brand-muted hover:text-brand-ink hover:bg-brand-bg transition-colors"
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="col-span-2">
+              <label className="block text-[10px] font-bold text-brand-muted uppercase tracking-widest mb-2">Nombre Completo</label>
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-muted" size={16} />
+                <input 
+                  type="text"
+                  required
+                  value={formData.name}
+                  onChange={e => setFormData({ ...formData, name: e.target.value })}
+                  className="w-full bg-brand-bg border border-white/10 rounded-lg py-2.5 pl-11 pr-4 focus:ring-1 focus:ring-brand-ink transition-all outline-none text-sm text-brand-ink"
+                  placeholder="Juan Pérez"
+                />
+              </div>
+            </div>
+
+            <div className="col-span-2">
+              <label className="block text-[10px] font-bold text-brand-muted uppercase tracking-widest mb-2">WhatsApp</label>
+              <div className="relative">
+                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-muted" size={16} />
+                <input 
+                  type="tel"
+                  required
+                  value={formData.phone}
+                  onChange={e => setFormData({ ...formData, phone: e.target.value })}
+                  className="w-full bg-brand-bg border border-white/10 rounded-lg py-2.5 pl-11 pr-4 focus:ring-1 focus:ring-brand-ink transition-all outline-none text-sm text-brand-ink"
+                  placeholder="5512345678"
+                />
+              </div>
+            </div>
+
+            <div className="col-span-2">
+              <label className="block text-[10px] font-bold text-brand-muted uppercase tracking-widest mb-2">Email</label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-muted" size={16} />
+                <input 
+                  type="email"
+                  value={formData.email}
+                  onChange={e => setFormData({ ...formData, email: e.target.value })}
+                  className="w-full bg-brand-bg border border-white/10 rounded-lg py-2.5 pl-11 pr-4 focus:ring-1 focus:ring-brand-ink transition-all outline-none text-sm text-brand-ink"
+                  placeholder="juan@email.com"
+                />
+              </div>
+            </div>
+
+            <div className="col-span-2">
+              <label className="block text-[10px] font-bold text-brand-muted uppercase tracking-widest mb-2">Ciudad / Estado</label>
+              <div className="relative">
+                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-muted" size={16} />
+                <input 
+                  type="text"
+                  required
+                  value={formData.address}
+                  onChange={e => setFormData({ ...formData, address: e.target.value })}
+                  className="w-full bg-brand-bg border border-white/10 rounded-lg py-2.5 pl-11 pr-4 focus:ring-1 focus:ring-brand-ink transition-all outline-none text-sm text-brand-ink"
+                  placeholder="Ciudad de México, CDMX"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-bold text-brand-muted uppercase tracking-widest mb-2">Instagram</label>
+              <input 
+                type="text"
+                value={formData.ig_handle}
+                onChange={e => setFormData({ ...formData, ig_handle: e.target.value })}
+                className="w-full bg-brand-bg border border-white/10 rounded-lg py-2.5 px-4 focus:ring-1 focus:ring-brand-ink transition-all outline-none text-sm text-brand-ink"
+                placeholder="@usuario"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-bold text-brand-muted uppercase tracking-widest mb-2">Referido Por</label>
+              <input 
+                type="text"
+                value={formData.referido_por}
+                onChange={e => setFormData({ ...formData, referido_por: e.target.value })}
+                className="w-full bg-brand-bg border border-white/10 rounded-lg py-2.5 px-4 focus:ring-1 focus:ring-brand-ink transition-all outline-none text-sm text-brand-ink"
+                placeholder="Nombre"
+              />
+            </div>
+
+            <div className="col-span-2">
+              <label className="block text-[10px] font-bold text-brand-muted uppercase tracking-widest mb-2">Notas</label>
+              <textarea 
+                value={formData.notas}
+                onChange={e => setFormData({ ...formData, notas: e.target.value })}
+                rows={3}
+                className="w-full bg-brand-bg border border-white/10 rounded-lg py-2.5 px-4 focus:ring-1 focus:ring-brand-ink transition-all outline-none text-sm text-brand-ink resize-none"
+                placeholder="Notas adicionales..."
+              />
+            </div>
+          </div>
+
+          <div className="flex gap-3 pt-4">
+            <button 
+              type="button"
+              onClick={onClose}
+              className="flex-1 py-3 rounded-lg font-bold text-sm border border-brand-border text-brand-muted hover:bg-brand-bg transition-colors"
+            >
+              Cancelar
+            </button>
+            <motion.button 
+              type="submit"
+              disabled={isSaving}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              className={cn(
+                "flex-1 py-3 rounded-lg font-bold text-sm tracking-tight flex items-center justify-center gap-2 transition-all",
+                showSuccess 
+                  ? "bg-green-500 text-white" 
+                  : "bg-brand-ink text-brand-bg hover:opacity-90"
+              )}
+            >
+              {showSuccess ? (
+                <>Guardado <Check size={16} /></>
+              ) : isSaving ? (
+                <div className="w-5 h-5 border-2 border-brand-bg/30 border-t-brand-bg rounded-full animate-spin" />
+              ) : (
+                <>Guardar <Plus size={16} /></>
+              )}
+            </motion.button>
+          </div>
+        </form>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+function Check({ size }: { size: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
   );
 }

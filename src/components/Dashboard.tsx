@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Product, DashboardStats, OrderStatus } from '../types';
 import { formatCurrency, cn } from '../lib/utils';
 import { 
@@ -24,6 +24,26 @@ interface DashboardProps {
 const COLORS = ['#000000', '#4F46E5', '#10B981', '#F59E0B', '#EF4444'];
 
 export function Dashboard({ products, onNavigate }: DashboardProps) {
+  const pieContainerRef = React.useRef<HTMLDivElement>(null);
+  const barContainerRef = React.useRef<HTMLDivElement>(null);
+  const [canRenderCharts, setCanRenderCharts] = React.useState(true);
+
+  React.useEffect(() => {
+    const checkDims = () => {
+      if (pieContainerRef.current && barContainerRef.current) {
+        const pieW = pieContainerRef.current.offsetWidth;
+        const barW = barContainerRef.current.offsetWidth;
+        setCanRenderCharts(pieW > 0 && barW > 0);
+      }
+    };
+    checkDims();
+    const t = setTimeout(checkDims, 300);
+    const ro = new ResizeObserver(checkDims);
+    if (pieContainerRef.current) ro.observe(pieContainerRef.current);
+    if (barContainerRef.current) ro.observe(barContainerRef.current);
+    return () => { ro.disconnect(); clearTimeout(t); };
+  }, []);
+
   const stats: DashboardStats = React.useMemo(() => {
     const s: DashboardStats = {
       totalItems: products.reduce((acc, p) => acc + (Number(p.quantity) || 0), 0),
@@ -108,13 +128,13 @@ export function Dashboard({ products, onNavigate }: DashboardProps) {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
-        <div className="bg-brand-surface p-4 lg:p-8 rounded-xl border border-brand-border min-h-[350px] lg:h-[400px] flex flex-col transition-colors duration-300">
+        <div ref={pieContainerRef} className="bg-brand-surface p-4 lg:p-8 rounded-xl border border-brand-border min-h-[350px] lg:h-[400px] flex flex-col transition-colors duration-300">
           <div className="flex justify-between items-center mb-4 lg:mb-8">
              <h3 className="font-bold text-xs lg:text-sm tracking-tight text-brand-ink">Distribución por Status</h3>
           </div>
-          {hasStatusData ? (
-            <div className="flex-1 w-full min-h-[250px]">
-              <ResponsiveContainer width="99%" height="100%">
+          {(canRenderCharts && hasStatusData) ? (
+            <div className="flex-1 w-full" style={{ minHeight: '280px', minWidth: 0 }}>
+              <ResponsiveContainer width="100%" height={280}>
                 <PieChart>
                   <Pie
                     data={statusData}
@@ -140,13 +160,13 @@ export function Dashboard({ products, onNavigate }: DashboardProps) {
           )}
         </div>
 
-        <div className="bg-white p-4 lg:p-8 rounded-xl border border-brand-border min-h-[350px] lg:h-[400px] flex flex-col">
+        <div ref={barContainerRef} className="bg-white p-4 lg:p-8 rounded-xl border border-brand-border min-h-[350px] lg:h-[400px] flex flex-col">
           <div className="flex justify-between items-center mb-4 lg:mb-8">
              <h3 className="font-bold text-xs lg:text-sm tracking-tight text-brand-ink">Niveles de Inventario</h3>
           </div>
-          {hasStockData ? (
-            <div className="flex-1 w-full min-h-[250px]">
-              <ResponsiveContainer width="99%" height="100%">
+{(canRenderCharts && hasStockData) ? (
+            <div className="flex-1 w-full" style={{ minHeight: '280px', minWidth: 0 }}>
+              <ResponsiveContainer width="100%" height={280}>
                 <BarChart data={stockData}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="currentColor" className="opacity-10" />
                   <XAxis dataKey="name" fontSize={10} tickLine={false} axisLine={false} tick={{fill: 'var(--brand-muted)'}} />

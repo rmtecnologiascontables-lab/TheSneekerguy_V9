@@ -376,6 +376,47 @@ app.get('/api/ai/status', (req, res) => {
     }
   });
 
+  app.post('/api/clientes/add', async (req, res) => {
+    try {
+      const auth = getAuthClient();
+      if (!auth) {
+        return res.status(500).json({ error: 'Google Sheets credentials not configured' });
+      }
+
+      const cliente = req.body;
+      const rowSize = 13; // A to M
+      const rowData = new Array(rowSize).fill('');
+      
+      // Map to CLIENTES tab structure (matching existing format from /api/orders)
+      rowData[0] = cliente.id_cliente || `CUST-${Date.now()}`; // ID_CLIENTE
+      rowData[1] = cliente.nombre || ''; // NOMBRE
+      rowData[2] = cliente.email || ''; // EMAIL
+      rowData[3] = cliente.telefono || ''; // TELEFONO
+      rowData[4] = cliente.direccion || ''; // DIRECCION
+      rowData[5] = cliente.ig_handle || ''; // IG_HANDLE
+      rowData[6] = cliente.referido_por || ''; // REFERIDO_POR
+      rowData[7] = new Date().toLocaleDateString(); // FECHA_ALTA
+      rowData[8] = 0; // TOTAL_PEDIDOS (Starts at 0)
+      rowData[9] = 0; // TOTAL_COMPRADO (Initial)
+      rowData[10] = cliente.notas || ''; // NOTAS
+      rowData[11] = cliente.tipo_de_pago || 'Transferencia'; // TIPO_DE_PAGO
+      rowData[12] = 'Activo'; // STATUS (Default)
+
+      await sheets.spreadsheets.values.append({
+        auth,
+        spreadsheetId: SHEET_ID,
+        range: "'CLIENTES'!A2",
+        valueInputOption: 'USER_ENTERED',
+        requestBody: { values: [rowData] },
+      });
+
+      res.json({ success: true, id_cliente: rowData[0] });
+    } catch (error: any) {
+      console.error('Error adding cliente:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.get('/api/products', async (req, res) => {
     try {
       const auth = getAuthClient();
@@ -470,8 +511,17 @@ app.get('/api/ai/status', (req, res) => {
           return imageUrl;
         }
         
-        // Si es base64, subir a Cloudinary
+        // Si es base64, verificar tamaño antes de procesar
         if (imageUrl && imageUrl.includes('data:image')) {
+          const base64Size = imageUrl.length;
+          const maxBase64Size = 45000; // Safe margin under 50K limit
+          
+          if (base64Size > maxBase64Size) {
+            console.warn(`[Products] Imagen demasiado grande (${base64Size} chars), truncando...`);
+            // No guardamos - devolvemos string vacío o placeholder
+            return '';
+          }
+          
           if (!isCloudinaryConfigured()) {
             console.warn('[Products] Cloudinary no configurado, guardando base64 como fallback');
             return imageUrl;
@@ -505,7 +555,7 @@ app.get('/api/ai/status', (req, res) => {
           } catch (err) {
             console.warn('[Products] Error subiendo imagen a Cloudinary:', err);
             console.log('[Products] Guardando base64 como fallback (puede causar error 50k chars)');
-            return imageUrl; // Guardar el base64 como fallback
+            return imageUrl;
           }
         }
         
@@ -733,5 +783,15 @@ app.get('/api/ai/status', (req, res) => {
     console.log(`Server running on http://localhost:${PORT}`);
   });
 }
+
+// Manejo de errores globales para evitar que el servidor se caiga
+process.on('uncaughtException', (err) => {
+  console.error('[SERVER] Error no capturado:', err.message);
+  console.error('[SERVER] Stack:', err.stack);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('[SERVER] Promise rechazado:', reason);
+});
 
 startServer();

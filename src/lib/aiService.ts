@@ -14,8 +14,8 @@ export const AI_PROVIDERS = {
   },
   ollama: {
     name: 'Ollama (Local)',
-    models: ['qwen2.5:0.5b', 'llama3.2:3b-instruct-q4_K_M', 'mi-modelo-3b:latest', 'conta-nav:latest', 'conta-cfo:latest'],
-    defaultModel: 'qwen2.5:0.5b'
+    models: ['llama3.2:3b-instruct-q4_K_M', 'mistral:latest', 'llama3:latest'],
+    defaultModel: 'llama3.2:3b-instruct-q4_K_M'
   },
   gemini: {
     name: 'Google Gemini',

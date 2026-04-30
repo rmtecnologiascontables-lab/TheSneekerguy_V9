@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   DollarSign, 
   TrendingUp, 
@@ -9,7 +9,10 @@ import {
   ArrowDownRight,
   Calculator,
   Clock as ClockIcon,
-  Package
+  Package,
+  Calendar,
+  ChevronDown,
+  X
 } from 'lucide-react';
 import { Product } from '../types';
 import { cn, formatCurrency } from '../lib/utils';
@@ -37,16 +40,61 @@ interface FinanceViewProps {
 export function FinanceView({ products, globalMarkup = 35, onUpdateMarkup }: FinanceViewProps) {
   const chartRef = React.useRef<HTMLDivElement>(null);
   const pieRef = React.useRef<HTMLDivElement>(null);
+  
+  const [dateRange, setDateRange] = useState<{ start: string; end: string } | null>(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  
+  const getPresetRange = (preset: string) => {
+    const now = new Date();
+    let start = new Date();
+    let end = new Date();
+    
+    switch (preset) {
+      case 'mes':
+        start = new Date(now.getFullYear(), now.getMonth(), 1);
+        break;
+      case 'mes-anterior':
+        start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        end = new Date(now.getFullYear(), now.getMonth(), 0);
+        break;
+      case 'quincena':
+        const day = now.getDate();
+        if (day <= 15) {
+          start = new Date(now.getFullYear(), now.getMonth(), 1);
+        } else {
+          start = new Date(now.getFullYear(), now.getMonth(), 16);
+        }
+        break;
+      case 'corte':
+        start = new Date(now.getFullYear(), now.getMonth(), 1);
+        break;
+    }
+    
+    return {
+      start: start.toISOString().split('T')[0],
+      end: end.toISOString().split('T')[0]
+    };
+  };
 
   const stats = React.useMemo(() => {
-    const totalCostoUsd = products.reduce((acc, p) => acc + (p.buyPriceUsd * (p.quantity || 1)), 0);
-    const totalCostoMxn = products.reduce((acc, p) => acc + (p.buyPriceMxn * (p.quantity || 1)), 0);
-    const totalVentaMxn = products.reduce((acc, p) => acc + ((p.sellPriceMxn || 0) * (p.quantity || 1)), 0);
-    const totalUtilidad = products.reduce((acc, p) => acc + ((p.profit || 0) * (p.quantity || 1)), 0);
+    let filteredProducts = products;
+    
+    if (dateRange) {
+      filteredProducts = products.filter(p => {
+        const productDate = p.createdAt?.split('T')[0];
+        if (!productDate) return false;
+        return productDate >= dateRange.start && productDate <= dateRange.end;
+      });
+    }
+    
+    const totalCostoUsd = filteredProducts.reduce((acc, p) => acc + (p.buyPriceUsd * (p.quantity || 1)), 0);
+    const totalCostoMxn = filteredProducts.reduce((acc, p) => acc + (p.buyPriceMxn * (p.quantity || 1)), 0);
+    const totalVentaMxn = filteredProducts.reduce((acc, p) => acc + ((p.sellPriceMxn || 0) * (p.quantity || 1)), 0);
+    const totalUtilidad = filteredProducts.reduce((acc, p) => acc + ((p.profit || 0) * (p.quantity || 1)), 0);
     
     // Category Breakdown
     const categoryData: Record<string, { name: string, value: number }> = {};
-    products.forEach(p => {
+    filteredProducts.forEach(p => {
       const cat = p.category || 'Otros';
       if (!categoryData[cat]) categoryData[cat] = { name: cat, value: 0 };
       categoryData[cat].value += (p.buyPriceMxn * (p.quantity || 1));
@@ -56,10 +104,10 @@ export function FinanceView({ products, globalMarkup = 35, onUpdateMarkup }: Fin
 
     // Status Breakdown for Cash Flow
     const statusData = [
-      { name: 'Comprado', value: products.filter(p => p.currentStatus === 'COMPRADO').reduce((acc, p) => acc + (p.quantity || 0), 0) },
-      { name: 'Tránsito', value: products.filter(p => p.currentStatus === 'EN_RUTA').reduce((acc, p) => acc + (p.quantity || 0), 0) },
-      { name: 'En Stock', value: products.filter(p => p.currentStatus === 'EN_BODEGA').reduce((acc, p) => acc + (p.quantity || 0), 0) },
-      { name: 'Entregado', value: products.filter(p => p.currentStatus === 'ENTREGADO').reduce((acc, p) => acc + (p.quantity || 0), 0) },
+      { name: 'Comprado', value: filteredProducts.filter(p => p.currentStatus === 'COMPRADO').reduce((acc, p) => acc + (p.quantity || 0), 0) },
+      { name: 'Tránsito', value: filteredProducts.filter(p => p.currentStatus === 'EN_RUTA').reduce((acc, p) => acc + (p.quantity || 0), 0) },
+      { name: 'En Stock', value: filteredProducts.filter(p => p.currentStatus === 'EN_BODEGA').reduce((acc, p) => acc + (p.quantity || 0), 0) },
+      { name: 'Entregado', value: filteredProducts.filter(p => p.currentStatus === 'ENTREGADO').reduce((acc, p) => acc + (p.quantity || 0), 0) },
     ];
 
     const totalUnits = statusData.reduce((acc, s) => acc + s.value, 0);
@@ -73,7 +121,7 @@ export function FinanceView({ products, globalMarkup = 35, onUpdateMarkup }: Fin
       statusData,
       totalUnits
     };
-  }, [products]);
+  }, [products, dateRange]);
 
   const COLORS = ['#141414', '#5A5A40', '#F27D26', '#00FF00', '#FF4E00', '#5A5A40'];
 
@@ -87,9 +135,89 @@ export function FinanceView({ products, globalMarkup = 35, onUpdateMarkup }: Fin
           <h2 className="text-2xl font-bold text-brand-ink">Resumen Financiero</h2>
           <p className="text-sm text-brand-muted font-medium">Análisis detallado de inversión y rentabilidad</p>
         </div>
-        <div className="flex items-center gap-2 bg-brand-bg px-4 py-2 rounded-xl border border-brand-border">
-          <ClockIcon className="text-brand-muted" size={16} />
-          <span className="text-xs font-bold text-brand-ink uppercase tracking-tight">Actualizado: {new Date().toLocaleDateString()}</span>
+        <div className="flex items-center gap-3">
+          {/* Date Range Filter */}
+          <div className="relative">
+            <button 
+              onClick={() => setShowDatePicker(!showDatePicker)}
+              className={cn(
+                "flex items-center gap-2 px-4 py-2 rounded-xl border transition-all text-sm font-bold",
+                dateRange 
+                  ? "bg-brand-accent text-white border-brand-accent" 
+                  : "bg-brand-bg text-brand-ink border-brand-border hover:border-brand-ink"
+              )}
+            >
+              <Calendar size={16} />
+              {dateRange ? `${dateRange.start} - ${dateRange.end}` : 'Filtrar por periodo'}
+              <ChevronDown size={14} className={cn(showDatePicker && "rotate-180", "transition-transform")} />
+            </button>
+            
+            {showDatePicker && (
+              <div className="absolute right-0 top-full mt-2 w-64 bg-brand-surface border border-brand-border rounded-xl shadow-2xl z-20 overflow-hidden">
+                <div className="p-3 space-y-2">
+                  <p className="text-[10px] font-bold text-brand-muted uppercase tracking-widest">Periodos Rápidos</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button 
+                      onClick={() => { setDateRange(getPresetRange('mes')); setShowDatePicker(false); }}
+                      className="px-3 py-2 text-xs font-bold text-brand-ink bg-brand-bg rounded-lg hover:bg-brand-ink hover:text-white transition-all"
+                    >
+                      Este Mes
+                    </button>
+                    <button 
+                      onClick={() => { setDateRange(getPresetRange('mes-anterior')); setShowDatePicker(false); }}
+                      className="px-3 py-2 text-xs font-bold text-brand-ink bg-brand-bg rounded-lg hover:bg-brand-ink hover:text-white transition-all"
+                    >
+                      Mes Anterior
+                    </button>
+                    <button 
+                      onClick={() => { setDateRange(getPresetRange('quincena')); setShowDatePicker(false); }}
+                      className="px-3 py-2 text-xs font-bold text-brand-ink bg-brand-bg rounded-lg hover:bg-brand-ink hover:text-white transition-all"
+                    >
+                      Quincena
+                    </button>
+                    <button 
+                      onClick={() => { setDateRange(getPresetRange('corte')); setShowDatePicker(false); }}
+                      className="px-3 py-2 text-xs font-bold text-brand-ink bg-brand-bg rounded-lg hover:bg-brand-ink hover:text-white transition-all"
+                    >
+                      Corte Mes
+                    </button>
+                  </div>
+                </div>
+                
+                <div className="p-3 border-t border-brand-border space-y-2">
+                  <p className="text-[10px] font-bold text-brand-muted uppercase tracking-widest">Personalizado</p>
+                  <div className="space-y-2">
+                    <input 
+                      type="date"
+                      value={dateRange?.start || ''}
+                      onChange={(e) => setDateRange(prev => ({ ...prev!, start: e.target.value }))}
+                      className="w-full px-3 py-2 text-xs bg-brand-bg border border-brand-border rounded-lg outline-none focus:border-brand-ink"
+                    />
+                    <input 
+                      type="date"
+                      value={dateRange?.end || ''}
+                      onChange={(e) => setDateRange(prev => ({ ...prev!, end: e.target.value }))}
+                      className="w-full px-3 py-2 text-xs bg-brand-bg border border-brand-border rounded-lg outline-none focus:border-brand-ink"
+                    />
+                  </div>
+                </div>
+                
+                {dateRange && (
+                  <button 
+                    onClick={() => { setDateRange(null); setShowDatePicker(false); }}
+                    className="w-full p-3 text-center text-xs font-bold text-red-500 border-t border-brand-border hover:bg-red-50 transition-colors"
+                  >
+                    Limpiar Filtro
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+          
+          <div className="flex items-center gap-2 bg-brand-bg px-4 py-2 rounded-xl border border-brand-border">
+            <ClockIcon className="text-brand-muted" size={16} />
+            <span className="text-xs font-bold text-brand-ink uppercase tracking-tight">Actualizado: {new Date().toLocaleDateString()}</span>
+          </div>
         </div>
       </header>
 
@@ -188,7 +316,7 @@ export function FinanceView({ products, globalMarkup = 35, onUpdateMarkup }: Fin
           </div>
           {hasCategoryData ? (
             <div className="h-[300px] w-full min-h-[300px]">
-              <ResponsiveContainer width="99%" height="100%">
+              <ResponsiveContainer width="99%" height={300}>
                 <BarChart data={stats.categoryChartData}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="currentColor" opacity={0.1} />
                   <XAxis 
@@ -242,7 +370,7 @@ export function FinanceView({ products, globalMarkup = 35, onUpdateMarkup }: Fin
           </div>
           {hasStatusData ? (
             <div className="h-[250px] w-full min-h-[250px]">
-              <ResponsiveContainer width="99%" height="100%">
+              <ResponsiveContainer width="99%" height={250}>
                 <PieChart>
                   <Pie
                     data={stats.statusData}
