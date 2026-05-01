@@ -60,8 +60,13 @@ export function SneekyBot({ settings }: SneekyBotProps) {
         Responde de manera profesional, corta y simpática. Preséntate si es la primera vez.
       `;
 
+      const aiMessages = messages.map(m => ({
+        role: m.role === 'bot' ? 'assistant' as const : m.role,
+        content: m.text
+      }));
+      
       const botResponse = await aiService.chat(
-        [...messages, { role: 'user', content: userMessage }],
+        [...aiMessages, { role: 'user', content: userMessage }],
         prompt
       );
 

@@ -145,7 +145,8 @@ export function ProductForm({
   customers = [],
   boutiques = [],
   masterCategories = [],
-  globalMarkup: initialGlobalMarkup = 30
+  globalMarkup: initialGlobalMarkup = 30,
+  onRefresh
 }: ProductFormProps) {
   // Common data for the entire purchase session
   const [commonData, setCommonData] = useState({

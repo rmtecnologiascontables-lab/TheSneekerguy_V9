@@ -57,7 +57,7 @@ import { ClientesPage } from './components/ClientesPage';
 import { cn, formatCurrency, formatDate, exportToCSV } from './lib/utils';
 import { SystemSettings as SettingsType } from './types';
 
-type ActiveTab = 'dashboard' | 'all' | 'pending' | 'delivered' | 'stock' | 'zafi' | 'orders' | 'finances' | 'settings' | 'catalog' | 'messaging' | 'advisor' | 'search' | 'clientes' | 'estatus';
+type ActiveTab = 'dashboard' | 'all' | 'pending' | 'delivered' | 'stock' | 'zafi' | 'orders' | 'finances' | 'settings' | 'catalog' | 'messaging' | 'advisor' | 'search' | 'clientes' | 'estatus' | 'browser';
 
 const STATUSES = [
   { id: 'COMPRADO', label: 'Comprado en USA', icon: '📦', color: '#3B82F6' },
@@ -304,7 +304,7 @@ export default function App() {
         // Build the full product state for update
         const updatedProduct = { ...editingProduct, ...data, updatedAt: new Date().toISOString() };
         
-        const response = await fetch(`/api/products/${editingProduct.originalId || editingProduct.id}`, {
+        const response = await fetch(`/api/products/${editingProduct.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(updatedProduct),
@@ -739,14 +739,14 @@ export default function App() {
               onRefresh={() => {}}
               isLoading={isLoading}
               onNavigateToProduct={(productId) => {
-                setEditingProduct(products.find(p => p.id === productId) || null);
+                setEditingProduct(products.find(p => p.id === productId));
                 setIsFormOpen(true);
               }}
             />
           )}
 
           {!isLoading && activeTab === 'search' && (
-            <BuscadorSneaker onNavigate={setActiveTab} />
+            <BuscadorSneaker onNavigate={(tab) => setActiveTab(tab as ActiveTab)} />
           )}
 
           <Toast toast={toast} onClose={() => setToast(null)} />

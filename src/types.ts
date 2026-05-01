@@ -65,6 +65,8 @@ export interface Product {
   createdAt: string;
   updatedAt: string;
   isShowcase?: boolean;
+  total_pedidos?: number;
+  fechaActualizacion?: string;
 }
 
 export interface StockMovement {

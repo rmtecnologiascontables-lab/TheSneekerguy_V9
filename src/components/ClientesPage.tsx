@@ -231,7 +231,7 @@ export function ClientesPage({ customers, products = [], onRefresh, isLoading, o
             customer={editingCustomer}
             products={selectedCustomerProducts}
             onClose={() => { setShowProductCard(false); setEditingCustomer(null); }}
-            onNavigate={(productId) => { onClose(); if (onNavigateToProduct) onNavigateToProduct(productId); }}
+            onNavigate={(productId) => { setShowProductCard(false); if (onNavigateToProduct) onNavigateToProduct(productId); }}
           />
         )}
       </AnimatePresence>
