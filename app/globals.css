@@ -1,0 +1,18 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+  --brand-bg: #F4F7F6;
+  --brand-surface: #FFFFFF;
+  --brand-border: #E5E9E8;
+  --brand-ink: #1A1A1A;
+  --brand-muted: #666666;
+}
+
+body { font-family: "Inter", sans-serif; -webkit-font-smoothing: antialiased; }
+
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
