@@ -87,7 +87,7 @@ class AIService {
     const formattedMessages = messages.map(m => {
       let role: string = 'user';
       if (m.role === 'system') role = 'system';
-      else if (m.role === 'assistant' || m.role === 'bot') role = 'assistant';
+      else if (m.role === 'assistant') role = 'assistant';
       else if (m.role === 'user') role = 'user';
       
       return {
@@ -145,26 +145,20 @@ class AIService {
   }
 
   private async chatWithGemini(messages: { role: 'user' | 'assistant' | 'system'; content: string }[]): Promise<string> {
-    const { GoogleGenAI } = await import('@google/genai');
+    const { GoogleGenerativeAI } = await import('@google/generative-ai');
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY as string;
     
     if (!apiKey) {
       throw new Error('Gemini API key not configured');
     }
 
-    const ai = new GoogleGenAI({ apiKey });
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: this.currentModel });
     
-    const formattedMessages = messages.map(m => ({
-      role: m.role === 'system' ? 'user' as const : m.role,
-      parts: [{ text: m.content }]
-    }));
+    const prompt = messages.map(m => `${m.role}: ${m.content}`).join('\n');
 
-    const response = await ai.models.generateContent({
-      model: this.currentModel,
-      contents: formattedMessages
-    });
-
-    return response.text || 'No response from AI';
+    const result = await model.generateContent(prompt);
+    return result.response.text() || 'No response from AI';
   }
 
   private async fallbackChat(messages: { role: 'user' | 'assistant' | 'system'; content: string }[]): Promise<string> {

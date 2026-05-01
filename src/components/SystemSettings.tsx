@@ -10,7 +10,7 @@ import {
   Zap,
   Info
 } from 'lucide-react';
-import { motion } from 'motion/react';
+import { motion } from 'framer-motion';
 import { SystemSettings as SettingsType } from '../types';
 import { cn } from '../lib/utils';
 

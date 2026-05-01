@@ -1,5 +1,5 @@
 import React from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { X, Upload, FileJson, FileSpreadsheet, AlertCircle, CheckCircle2, Loader2, FileText } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { Product, OrderStatus } from '../types';

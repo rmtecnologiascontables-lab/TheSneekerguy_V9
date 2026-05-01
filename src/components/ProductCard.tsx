@@ -3,7 +3,7 @@ import { Product, OrderStatus } from '../types';
 import { cn, formatCurrency } from '../lib/utils';
 import { StatusPipeline } from './StatusPipeline';
 import { MoreHorizontal, Edit2, Trash2, ArrowUpRight, ChevronDown, Check } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface ProductCardProps {
   product: Product;

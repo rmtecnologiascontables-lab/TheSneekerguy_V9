@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Search, Plus, X, Send, User, Phone, MapPin, Mail, DollarSign, MessageSquare, Eye, EyeOff, CreditCard, Package } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Customer, Product } from '../types';
 import { cn, formatCurrency } from '../lib/utils';
 

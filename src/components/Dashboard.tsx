@@ -14,7 +14,7 @@ import {
   Cell
 } from 'recharts';
 import { Package, AlertTriangle, DollarSign, Activity } from 'lucide-react';
-import { motion } from 'motion/react';
+import { motion } from 'framer-motion';
 
 interface DashboardProps {
   products: Product[];

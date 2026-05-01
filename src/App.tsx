@@ -36,7 +36,7 @@ import {
   Moon,
   ShoppingCart,
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Product, OrderStatus, CustomerOrder, Customer, Category } from './types';
 import { INITIAL_PRODUCTS } from './data/mockData';
 import { INITIAL_CATEGORIES } from './data/categories';

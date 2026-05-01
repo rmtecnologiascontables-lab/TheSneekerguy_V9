@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Package, Truck, AlertTriangle, Check, X, Search, Eye, Clock } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Product } from '../types';
 import { cn, formatCurrency } from '../lib/utils';
 
